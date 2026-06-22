@@ -188,7 +188,7 @@ p {
   margin-bottom: 16px;
 }
 
-.next-match,
+.match-spotlight,
 .metric {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -198,21 +198,46 @@ p {
   box-shadow: 0 10px 32px rgba(7, 24, 47, 0.06);
 }
 
-.next-match {
+.match-spotlight {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: space-between;
+  gap: 12px;
   text-align: left;
   background:
     linear-gradient(90deg, rgba(19, 189, 212, 0.15), rgba(22, 163, 111, 0.08)),
     var(--surface);
-}
-
-button.next-match {
   color: var(--ink);
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
-.next-match span,
+.match-spotlight:hover,
+.match-spotlight:focus-visible {
+  border-color: rgba(19, 189, 212, 0.45);
+  box-shadow: 0 16px 42px rgba(7, 24, 47, 0.1);
+  outline: 0;
+}
+
+.match-spotlight.live {
+  background:
+    linear-gradient(135deg, rgba(212, 67, 53, 0.12), rgba(19, 189, 212, 0.1)),
+    var(--surface);
+}
+
+.spotlight-topline,
+.spotlight-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.spotlight-topline span,
 .metric span {
   color: var(--muted);
   text-transform: uppercase;
@@ -220,15 +245,126 @@ button.next-match {
   font-weight: 820;
 }
 
-.next-match strong {
-  font-size: 1.3rem;
-  line-height: 1.15;
-  margin: 4px 0;
+.match-spotlight.live .spotlight-topline span {
+  color: var(--red);
 }
 
-.next-match small {
+.spotlight-topline small {
+  min-height: 22px;
+  padding: 0 8px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(7, 24, 47, 0.08);
   color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 820;
+}
+
+.spotlight-scoreboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.spotlight-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.spotlight-team.away {
+  justify-content: flex-end;
+}
+
+.spotlight-team img {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.spotlight-team strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 1.1rem;
+}
+
+.spotlight-score {
+  min-width: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.spotlight-score strong {
+  font-size: 1.9rem;
+  line-height: 1;
+}
+
+.spotlight-score span,
+.spotlight-footer {
+  color: var(--muted);
+  font-size: 0.84rem;
   font-weight: 620;
+}
+
+.spotlight-score span {
+  margin-top: 4px;
+  white-space: nowrap;
+}
+
+.spotlight-footer > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spotlight-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.spotlight-controls button {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(7, 24, 47, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink);
+  padding: 0;
+}
+
+.spotlight-controls > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.spotlight-controls > div span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(97, 112, 138, 0.35);
+}
+
+.spotlight-controls > div span.active {
+  width: 14px;
+  background: var(--red);
 }
 
 .metric {
@@ -1131,7 +1267,7 @@ button.next-match {
     grid-template-columns: repeat(4, 1fr);
   }
 
-  .next-match {
+  .match-spotlight {
     grid-column: 1 / -1;
   }
 
@@ -1173,7 +1309,7 @@ button.next-match {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .next-match {
+  .match-spotlight {
     min-height: 98px;
   }
 
@@ -1260,6 +1396,47 @@ button.next-match {
 
   .metric strong {
     font-size: 1.35rem;
+  }
+
+  .match-spotlight {
+    padding: 12px;
+  }
+
+  .spotlight-scoreboard {
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) 82px minmax(0, 1fr);
+  }
+
+  .spotlight-team {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .spotlight-team.away {
+    align-items: flex-end;
+  }
+
+  .spotlight-team img {
+    width: 28px;
+    height: 28px;
+  }
+
+  .spotlight-score {
+    min-width: 0;
+  }
+
+  .spotlight-score strong {
+    font-size: 1.45rem;
+  }
+
+  .spotlight-score span {
+    font-size: 0.72rem;
+  }
+
+  .spotlight-footer {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .filters {

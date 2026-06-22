@@ -5,6 +5,8 @@ import {
   ArrowLeft,
   BarChart3,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Clock3,
   Download,
@@ -157,6 +159,10 @@ function kickoffTime(match) {
 
 function compareMatchesByKickoff(a, b) {
   return kickoffTime(a) - kickoffTime(b) || a.matchNumber - b.matchNumber;
+}
+
+function liveClockLabel(match) {
+  return match.raw.MatchTime || match.raw.MatchMinute || match.raw.MatchClock || "En vivo";
 }
 
 function useFixture() {
@@ -356,6 +362,10 @@ function App() {
       matches[0]
     );
   }, [matches]);
+  const liveMatches = useMemo(
+    () => matches.filter((match) => match.statusTone === "live").sort(compareMatchesByKickoff),
+    [matches]
+  );
 
   const grouped = groupByDate(filteredMatches);
   const playedCount = matches.filter((match) => match.statusTone === "played").length;
@@ -415,7 +425,11 @@ function App() {
       {error && <div className="notice">{error}</div>}
 
       <section className="score-strip">
-        <NextMatch match={nextMatch} onOpen={() => nextMatch && setDetailMatchId(nextMatch.id)} />
+        <MatchSpotlight
+          liveMatches={liveMatches}
+          nextMatch={nextMatch}
+          onOpen={(match) => match && setDetailMatchId(match.id)}
+        />
         <div className="metric">
           <strong>{matches.length}</strong>
           <span>partidos</span>
@@ -492,19 +506,117 @@ function App() {
   );
 }
 
-function NextMatch({ match, onOpen }) {
-  if (!match) return null;
+function MatchSpotlight({ liveMatches, nextMatch, onOpen }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const hasLive = liveMatches.length > 0;
+  const spotlightMatches = hasLive ? liveMatches : nextMatch ? [nextMatch] : [];
+  const activeMatch = spotlightMatches[activeIndex] || spotlightMatches[0];
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [hasLive, spotlightMatches.length]);
+
+  if (!activeMatch) return null;
+
+  const hasScore = activeMatch.homeScore !== null || activeMatch.awayScore !== null;
+  const multipleLive = hasLive && spotlightMatches.length > 1;
+  const title = hasLive ? "Partido en vivo" : "Próximo partido";
+  const meta = hasLive
+    ? [liveClockLabel(activeMatch), activeMatch.stage, activeMatch.group].filter(Boolean).join(" · ")
+    : `${formatDate(activeMatch.date, { weekday: "short", day: "2-digit", month: "short" })} · ${timeLabel(activeMatch)}`;
+
+  function previous(event) {
+    event.stopPropagation();
+    setActiveIndex((current) => (current - 1 + spotlightMatches.length) % spotlightMatches.length);
+  }
+
+  function next(event) {
+    event.stopPropagation();
+    setActiveIndex((current) => (current + 1) % spotlightMatches.length);
+  }
+
+  function stopCarouselKeyDown(event) {
+    event.stopPropagation();
+  }
+
+  function openActiveMatch() {
+    onOpen(activeMatch);
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openActiveMatch();
+    }
+  }
+
   return (
-    <button className="next-match" onClick={onOpen}>
-      <span>Próximo partido</span>
-      <strong>
-        {match.homeCode} vs {match.awayCode}
-      </strong>
-      <small>
-        {formatDate(match.date, { weekday: "short", day: "2-digit", month: "short" })} ·{" "}
-        {timeLabel(match)} · {match.city}
-      </small>
-    </button>
+    <section
+      className={`match-spotlight ${hasLive ? "live" : "upcoming"}`}
+      role="button"
+      tabIndex={0}
+      onClick={openActiveMatch}
+      onKeyDown={handleKeyDown}
+      aria-label={`${title}: ${activeMatch.homeCode} vs ${activeMatch.awayCode}`}
+    >
+      <div className="spotlight-topline">
+        <span>{title}</span>
+        {multipleLive && <small>{activeIndex + 1} / {spotlightMatches.length}</small>}
+      </div>
+
+      <div className="spotlight-scoreboard">
+        <div className="spotlight-team">
+          {activeMatch.homeFlag && <img src={flagUrl(activeMatch.homeFlag)} alt="" />}
+          <strong>{activeMatch.homeCode}</strong>
+        </div>
+        <div className="spotlight-score">
+          {hasScore ? (
+            <strong>
+              {activeMatch.homeScore ?? "-"} : {activeMatch.awayScore ?? "-"}
+            </strong>
+          ) : (
+            <strong>vs</strong>
+          )}
+          <span>{meta}</span>
+        </div>
+        <div className="spotlight-team away">
+          {activeMatch.awayFlag && <img src={flagUrl(activeMatch.awayFlag)} alt="" />}
+          <strong>{activeMatch.awayCode}</strong>
+        </div>
+      </div>
+
+      <div className="spotlight-footer">
+        <span>
+          <MapPin size={14} />
+          {activeMatch.city || activeMatch.stadium || "Sede por definir"}
+        </span>
+        {multipleLive && (
+          <div className="spotlight-controls" aria-label="Partidos en vivo">
+            <button
+              type="button"
+              onClick={previous}
+              onKeyDown={stopCarouselKeyDown}
+              aria-label="Partido en vivo anterior"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <div>
+              {spotlightMatches.map((match, index) => (
+                <span key={match.id} className={index === activeIndex ? "active" : ""} />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={next}
+              onKeyDown={stopCarouselKeyDown}
+              aria-label="Siguiente partido en vivo"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
