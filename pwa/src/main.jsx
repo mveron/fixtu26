@@ -29,6 +29,8 @@ import "./styles.css";
 
 const FIFA_FIXTURE_URL =
   "https://api.fifa.com/api/v3/calendar/matches?language=es&count=500&idSeason=285023";
+const FIFA_LIVE_FEED_URL =
+  "https://api.fifa.com/api/v3/live/football?language=es&count=500&idSeason=285023";
 const FIFA_TIMELINE_URL = "https://api.fifa.com/api/v3/timelines";
 const MATCH_CENTRE_BASE = "https://www.fifa.com/es/match-centre/match";
 const TIME_ZONE = "America/Buenos_Aires";
@@ -192,10 +194,36 @@ function liveClockLabel(match) {
 }
 
 function scoreFromRaw(match, raw, side) {
-  const team = side === "home" ? raw?.Home : raw?.Away;
+  const team = side === "home" ? raw?.HomeTeam || raw?.Home : raw?.AwayTeam || raw?.Away;
   const topLevelScore = side === "home" ? raw?.HomeTeamScore : raw?.AwayTeamScore;
   const fallback = side === "home" ? match.homeScore : match.awayScore;
   return scoreValue(team?.Score, scoreValue(topLevelScore, fallback));
+}
+
+function findLiveFeedMatch(data, matchId) {
+  return (data?.Results || []).find((entry) => String(entry.IdMatch) === String(matchId)) || null;
+}
+
+function mergeLiveFeedMatch(match, liveEntry) {
+  if (!liveEntry) return match.raw;
+
+  const homeScore = scoreValue(liveEntry.HomeTeam?.Score, scoreValue(liveEntry.HomeTeamScore, match.raw.HomeTeamScore));
+  const awayScore = scoreValue(liveEntry.AwayTeam?.Score, scoreValue(liveEntry.AwayTeamScore, match.raw.AwayTeamScore));
+
+  return {
+    ...match.raw,
+    ...liveEntry,
+    Home: liveEntry.HomeTeam || liveEntry.Home || match.raw.Home,
+    Away: liveEntry.AwayTeam || liveEntry.Away || match.raw.Away,
+    HomeTeam: liveEntry.HomeTeam || match.raw.Home,
+    AwayTeam: liveEntry.AwayTeam || match.raw.Away,
+    MatchStatus: liveEntry.MatchStatus ?? match.raw.MatchStatus,
+    MatchTime: liveEntry.MatchTime || match.raw.MatchTime,
+    MatchMinute: liveEntry.MatchMinute || match.raw.MatchMinute,
+    MatchClock: liveEntry.MatchClock || match.raw.MatchClock,
+    HomeTeamScore: homeScore,
+    AwayTeamScore: awayScore
+  };
 }
 
 function liveMatchStatus(match, raw) {
@@ -289,12 +317,13 @@ function useFixture() {
 }
 
 function useMatchFeed(match) {
+  const [liveMatch, setLiveMatch] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const requestIdRef = useRef(0);
 
-  const loadTimeline = useCallback(async (options = {}) => {
+  const loadMatchFeed = useCallback(async (options = {}) => {
     if (!match?.id) return;
     const silent = options.silent === true;
     const requestId = requestIdRef.current + 1;
@@ -305,30 +334,43 @@ function useMatchFeed(match) {
       setError("");
     }
     try {
-      const data = await fetchFifaJson(`${FIFA_TIMELINE_URL}/${match.id}?language=es`);
+      const [liveResult, timelineResult] = await Promise.allSettled([
+        fetchFifaJson(FIFA_LIVE_FEED_URL),
+        fetchFifaJson(`${FIFA_TIMELINE_URL}/${match.id}?language=es`)
+      ]);
       if (requestIdRef.current !== requestId) return;
-      setEvents(data.Event || []);
+
+      const liveEntry =
+        liveResult.status === "fulfilled" ? findLiveFeedMatch(liveResult.value, match.id) : null;
+      setLiveMatch(mergeLiveFeedMatch(match, liveEntry));
+      setEvents(timelineResult.status === "fulfilled" ? timelineResult.value.Event || [] : []);
+
+      if (liveResult.status === "rejected" && timelineResult.status === "rejected" && !silent) {
+        setError("No se pudo cargar el detalle en vivo.");
+      }
     } catch {
       if (requestIdRef.current !== requestId) return;
       if (!silent) {
+        setLiveMatch(match.raw);
         setEvents([]);
-        setError("No se pudo cargar la cronología en vivo.");
+        setError("No se pudo cargar el detalle en vivo.");
       }
     } finally {
       if (requestIdRef.current === requestId && !silent) setLoading(false);
     }
-  }, [match?.id]);
+  }, [match]);
 
   useEffect(() => {
-    loadTimeline();
-  }, [loadTimeline]);
+    setLiveMatch(match?.raw || null);
+    loadMatchFeed();
+  }, [loadMatchFeed, match?.raw]);
 
   useEffect(() => {
     if (!match?.id) return undefined;
     const detailInterval = match.statusTone === "live" ? LIVE_DETAIL_REFRESH_MS : IDLE_DETAIL_REFRESH_MS;
     const refreshSilently = () => {
       if (navigator.onLine && documentIsVisible()) {
-        loadTimeline({ silent: true });
+        loadMatchFeed({ silent: true });
       }
     };
     const intervalId = window.setInterval(refreshSilently, detailInterval);
@@ -341,14 +383,14 @@ function useMatchFeed(match) {
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [loadTimeline, match?.id, match?.statusTone]);
+  }, [loadMatchFeed, match?.id, match?.statusTone]);
 
   return {
-    liveMatch: match?.raw || null,
+    liveMatch: liveMatch || match?.raw || null,
     events,
     loading,
     error,
-    refresh: () => loadTimeline()
+    refresh: () => loadMatchFeed()
   };
 }
 
@@ -1364,8 +1406,8 @@ function pitchPlacements(players, tactic) {
 }
 
 function teamFromLive(match, liveMatch, side) {
-  if (side === "home") return liveMatch?.HomeTeam || match.raw.Home;
-  return liveMatch?.AwayTeam || match.raw.Away;
+  if (side === "home") return liveMatch?.HomeTeam || liveMatch?.Home || match.raw.Home;
+  return liveMatch?.AwayTeam || liveMatch?.Away || match.raw.Away;
 }
 
 function FormationView({ match, liveMatch }) {
