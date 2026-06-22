@@ -4,6 +4,20 @@ Fixtu26 is a progressive web app for following the FIFA World Cup 2026 fixture w
 
 Live app: https://fixtu26.netlify.app
 
+## Screenshots
+
+### Fixture dashboard
+
+![Fixtu26 desktop fixture dashboard](docs/screenshots/fixtu26-home-desktop.png)
+
+### Match detail
+
+![Fixtu26 desktop match detail screen](docs/screenshots/fixtu26-match-detail-desktop.png)
+
+### Mobile match detail
+
+![Fixtu26 mobile match detail screen](docs/screenshots/fixtu26-match-detail-mobile.png)
+
 ## Features
 
 - Full World Cup 2026 match calendar.
