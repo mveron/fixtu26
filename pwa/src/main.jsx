@@ -150,6 +150,15 @@ function timeLabel(match) {
   });
 }
 
+function kickoffTime(match) {
+  const timestamp = new Date(match.date).getTime();
+  return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
+}
+
+function compareMatchesByKickoff(a, b) {
+  return kickoffTime(a) - kickoffTime(b) || a.matchNumber - b.matchNumber;
+}
+
 function useFixture() {
   const [matches, setMatches] = useState([]);
   const [source, setSource] = useState("Cargando");
@@ -170,7 +179,7 @@ function useFixture() {
         throw new Error("offline");
       }
       const data = await response.json();
-      const normalized = data.Results.map(toMatch).sort((a, b) => a.matchNumber - b.matchNumber);
+      const normalized = data.Results.map(toMatch).sort(compareMatchesByKickoff);
       setMatches(normalized);
       setUpdatedAt(new Date());
       localStorage.setItem("fixture-cache", JSON.stringify({ savedAt: Date.now(), data }));
@@ -180,7 +189,7 @@ function useFixture() {
         const data = cached
           ? JSON.parse(cached).data
           : await fetch("/fixture-seed.json").then((response) => response.json());
-        setMatches(data.Results.map(toMatch).sort((a, b) => a.matchNumber - b.matchNumber));
+        setMatches(data.Results.map(toMatch).sort(compareMatchesByKickoff));
         setSource(cached ? "Cache local" : "Snapshot offline");
         setUpdatedAt(cached ? new Date(JSON.parse(cached).savedAt) : null);
         if (preferNetwork) setError("No se pudo refrescar FIFA API; se usa cache local.");

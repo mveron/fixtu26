@@ -315,6 +315,7 @@ button.next-match {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  min-width: 0;
   color: var(--muted);
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -331,6 +332,8 @@ button.next-match {
 }
 
 .filters select {
+  width: 100%;
+  min-width: 0;
   padding: 0 34px 0 10px;
   font-size: 0.88rem;
   font-weight: 680;
