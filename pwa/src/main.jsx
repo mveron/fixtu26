@@ -1197,6 +1197,62 @@ function positionLabel(position) {
   return "Plantel";
 }
 
+function starterSortValue(player) {
+  const positionOrder = { 0: 0, 1: 1, 2: 2, 3: 3 };
+  return (positionOrder[player.Position] ?? 4) * 100 + (player.ShirtNumber || 0);
+}
+
+function fallbackTacticLines(players) {
+  const counts = players.reduce(
+    (acc, player) => {
+      if (player.Position === 0) acc[0] += 1;
+      else if (player.Position === 1) acc[1] += 1;
+      else if (player.Position === 2) acc[2] += 1;
+      else if (player.Position === 3) acc[3] += 1;
+      return acc;
+    },
+    [0, 0, 0, 0]
+  );
+
+  const outfield = counts.slice(1).filter(Boolean);
+  return [counts[0] || 1, ...(outfield.length ? outfield : [4, 3, 3])];
+}
+
+function tacticLines(tactic, players) {
+  const parsed = String(tactic || "")
+    .split("-")
+    .map((chunk) => Number.parseInt(chunk, 10))
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  if (!parsed.length) return fallbackTacticLines(players);
+
+  const expectedOutfield = Math.max(players.length - 1, 0);
+  const parsedTotal = parsed.reduce((sum, value) => sum + value, 0);
+  if (parsedTotal !== expectedOutfield) return fallbackTacticLines(players);
+
+  return [1, ...parsed];
+}
+
+function pitchPlacements(players, tactic) {
+  const sortedPlayers = players.slice().sort((a, b) => starterSortValue(a) - starterSortValue(b));
+  const lines = tacticLines(tactic, sortedPlayers);
+  const lineGap = lines.length > 1 ? 72 / (lines.length - 1) : 0;
+  let offset = 0;
+
+  return lines.flatMap((lineCount, lineIndex) => {
+    const linePlayers = sortedPlayers.slice(offset, offset + lineCount);
+    offset += lineCount;
+
+    const y = lines.length === 1 ? 50 : 88 - lineIndex * lineGap;
+    return linePlayers.map((player, slotIndex) => ({
+      player,
+      lineCount: linePlayers.length,
+      x: ((slotIndex + 1) * 100) / (linePlayers.length + 1),
+      y
+    }));
+  });
+}
+
 function teamFromLive(match, liveMatch, side) {
   if (side === "home") return liveMatch?.HomeTeam || match.raw.Home;
   return liveMatch?.AwayTeam || match.raw.Away;
@@ -1207,42 +1263,33 @@ function FormationView({ match, liveMatch }) {
   const away = teamFromLive(match, liveMatch, "away");
   return (
     <div className="formation-grid">
-      <TeamFormation title={match.homeName} code={match.homeCode} team={home} />
-      <TeamFormation title={match.awayName} code={match.awayCode} team={away} />
+      <TeamFormation title={match.homeName} code={match.homeCode} flag={match.homeFlag} team={home} />
+      <TeamFormation title={match.awayName} code={match.awayCode} flag={match.awayFlag} team={away} />
     </div>
   );
 }
 
-function TeamFormation({ title, code, team }) {
+function TeamFormation({ title, code, flag, team }) {
   const players = team?.Players || [];
   const starters = players.filter((player) => player.Status === 1).slice(0, 11);
-  const bench = players.filter((player) => player.Status !== 1).slice(0, 9);
-  const visiblePlayers = starters.length ? starters : players.slice(0, 11);
+  const bench = starters.length ? players.filter((player) => player.Status !== 1).slice(0, 9) : [];
 
   return (
     <section className="formation-card">
       <div className="formation-card-head">
-        <div>
-          <span>{code}</span>
-          <h2>{title}</h2>
+        <div className="formation-team-title">
+          {flag ? <img src={flagUrl(flag)} alt="" /> : <span className="formation-flag-fallback">{code[0]}</span>}
+          <div>
+            <span>{code}</span>
+            <h2>{title}</h2>
+          </div>
         </div>
-        <strong>{team?.Tactics || "Formación TBC"}</strong>
+        <strong>{team?.Tactics || "TBC"}</strong>
       </div>
-      {visiblePlayers.length ? (
-        <div className="player-list">
-          {visiblePlayers.map((player) => (
-            <div className="player-row" key={player.IdPlayer || `${code}-${player.ShirtNumber}`}>
-              <span>{player.ShirtNumber || "--"}</span>
-              <strong>{playerName(player)}</strong>
-              <small>
-                {positionLabel(player.Position)}
-                {player.Captain ? " · C" : ""}
-              </small>
-            </div>
-          ))}
-        </div>
+      {starters.length ? (
+        <PitchFormation players={starters} tactic={team?.Tactics} teamCode={code} />
       ) : (
-        <div className="timeline-empty">FIFA todavía no publicó la formación de este equipo.</div>
+        <div className="timeline-empty formation-empty">FIFA todavía no publicó la formación inicial de este equipo.</div>
       )}
       {bench.length > 0 && (
         <details className="bench-list">
@@ -1256,6 +1303,35 @@ function TeamFormation({ title, code, team }) {
         </details>
       )}
     </section>
+  );
+}
+
+function PitchFormation({ players, tactic, teamCode }) {
+  const placements = pitchPlacements(players, tactic);
+
+  return (
+    <div className="pitch-formation" aria-label={`Formación de ${teamCode}`}>
+      <span className="pitch-halfway" aria-hidden="true" />
+      <span className="pitch-circle" aria-hidden="true" />
+      <span className="pitch-box pitch-box-top" aria-hidden="true" />
+      <span className="pitch-box pitch-box-bottom" aria-hidden="true" />
+      <span className="pitch-goal pitch-goal-top" aria-hidden="true" />
+      <span className="pitch-goal pitch-goal-bottom" aria-hidden="true" />
+      {placements.map(({ player, lineCount, x, y }) => (
+        <div
+          className={`pitch-player line-${lineCount}`}
+          key={player.IdPlayer || `${teamCode}-${player.ShirtNumber}-${x}-${y}`}
+          style={{ left: `${x}%`, top: `${y}%` }}
+        >
+          <span className="pitch-number">{player.ShirtNumber || "--"}</span>
+          <strong>{playerName(player)}</strong>
+          <small>
+            {positionLabel(player.Position)}
+            {player.Captain ? " - C" : ""}
+          </small>
+        </div>
+      ))}
+    </div>
   );
 }
 
