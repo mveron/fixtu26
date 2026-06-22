@@ -224,6 +224,8 @@ p {
   display: inline-grid;
   place-items: center;
   border-radius: 8px;
+  font-size: inherit;
+  line-height: inherit;
   transition:
     background-color 0.22s ease,
     color 0.22s ease,
@@ -271,6 +273,55 @@ p {
 .hero-scoreline .animated-score,
 .detail-scoreline .animated-score {
   display: inline-grid;
+  font-weight: 920;
+  color: var(--ink);
+}
+
+.score-cell .animated-score .score-number,
+.score-cell .animated-score .score-separator,
+.group-match-teams .animated-score .score-number,
+.group-match-teams .animated-score .score-separator,
+.stat-card .animated-score .score-number,
+.stat-card .animated-score .score-separator,
+.spotlight-score .animated-score .score-number,
+.spotlight-score .animated-score .score-separator,
+.hero-scoreline .animated-score .score-number,
+.hero-scoreline .animated-score .score-separator,
+.detail-scoreline .animated-score .score-number,
+.detail-scoreline .animated-score .score-separator {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.spotlight-score .animated-score {
+  font-size: clamp(2.9rem, 6vw, 3.35rem);
+  letter-spacing: 0;
+}
+
+.score-cell .animated-score {
+  font-size: 1.34rem;
+}
+
+.group-match-teams .animated-score {
+  font-size: 1.1rem;
+}
+
+.stat-card .animated-score {
+  font-size: 2.35rem;
+}
+
+.hero-scoreline .animated-score {
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.54);
+  box-shadow:
+    0 12px 30px rgba(7, 24, 47, 0.08),
+    inset 0 0 0 1px rgba(7, 24, 47, 0.06);
+  font-size: clamp(3.65rem, 9vw, 5.4rem);
+}
+
+.detail-scoreline .animated-score {
+  font-size: 1.75rem;
 }
 
 .match-spotlight.live,
@@ -2189,7 +2240,7 @@ p {
 
   .spotlight-scoreboard {
     gap: 8px;
-    grid-template-columns: minmax(0, 1fr) 82px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 108px minmax(0, 1fr);
   }
 
   .spotlight-team {
@@ -2212,7 +2263,7 @@ p {
   }
 
   .spotlight-score strong {
-    font-size: 1.45rem;
+    font-size: 2.85rem;
   }
 
   .spotlight-score span {
@@ -2247,7 +2298,7 @@ p {
 
   .match-row {
     min-height: 88px;
-    grid-template-columns: 44px 1fr 52px 1fr;
+    grid-template-columns: 44px 1fr 66px 1fr;
     padding: 8px;
   }
 
@@ -2342,7 +2393,7 @@ p {
   }
 
   .hero-scoreline strong {
-    font-size: 2.4rem;
+    font-size: 3.85rem;
   }
 
   .detail-tabs {
