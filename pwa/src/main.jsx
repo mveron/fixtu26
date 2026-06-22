@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity,
@@ -29,10 +29,31 @@ import "./styles.css";
 
 const FIFA_FIXTURE_URL =
   "https://api.fifa.com/api/v3/calendar/matches?language=es&count=500&idSeason=285023";
-const FIFA_LIVE_URL = "https://api.fifa.com/api/v3/live/football";
 const FIFA_TIMELINE_URL = "https://api.fifa.com/api/v3/timelines";
 const MATCH_CENTRE_BASE = "https://www.fifa.com/es/match-centre/match";
 const TIME_ZONE = "America/Buenos_Aires";
+const LIVE_FIXTURE_REFRESH_MS = 15000;
+const IDLE_FIXTURE_REFRESH_MS = 60000;
+const LIVE_DETAIL_REFRESH_MS = 10000;
+const IDLE_DETAIL_REFRESH_MS = 60000;
+
+function freshUrl(url) {
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}_=${Date.now()}`;
+}
+
+async function fetchFifaJson(url) {
+  const response = await fetch(freshUrl(url), {
+    cache: "no-store",
+    headers: { accept: "application/json" }
+  });
+  if (!response.ok) throw new Error(`FIFA API ${response.status}`);
+  return response.json();
+}
+
+function documentIsVisible() {
+  return typeof document === "undefined" || document.visibilityState !== "hidden";
+}
 
 function localized(value, locale = "es-ES") {
   if (!Array.isArray(value)) return "";
@@ -162,8 +183,38 @@ function compareMatchesByKickoff(a, b) {
   return kickoffTime(a) - kickoffTime(b) || a.matchNumber - b.matchNumber;
 }
 
+function liveClockFromRaw(raw) {
+  return raw?.MatchTime || raw?.MatchMinute || raw?.MatchClock || "En vivo";
+}
+
 function liveClockLabel(match) {
-  return match.raw.MatchTime || match.raw.MatchMinute || match.raw.MatchClock || "En vivo";
+  return liveClockFromRaw(match.raw);
+}
+
+function scoreFromRaw(match, raw, side) {
+  const team = side === "home" ? raw?.Home : raw?.Away;
+  const topLevelScore = side === "home" ? raw?.HomeTeamScore : raw?.AwayTeamScore;
+  const fallback = side === "home" ? match.homeScore : match.awayScore;
+  return scoreValue(team?.Score, scoreValue(topLevelScore, fallback));
+}
+
+function liveMatchStatus(match, raw) {
+  return raw?.MatchStatus ?? match.status;
+}
+
+function liveMatchTone(match, raw) {
+  return statusTone(liveMatchStatus(match, raw));
+}
+
+function liveMatchLabel(match, raw) {
+  return statusLabel(liveMatchStatus(match, raw));
+}
+
+function detailClockLabel(match, raw) {
+  const tone = liveMatchTone(match, raw);
+  if (tone === "live") return liveClockFromRaw(raw);
+  if (tone === "played") return "Finalizado";
+  return "Programado";
 }
 
 function useFixture() {
@@ -173,24 +224,25 @@ function useFixture() {
   const [error, setError] = useState("");
   const [updatedAt, setUpdatedAt] = useState(null);
 
-  async function loadFixture(preferNetwork = true) {
-    setLoading(true);
-    setError("");
+  const loadFixture = useCallback(async (preferNetwork = true, options = {}) => {
+    const silent = options.silent === true;
+    if (!silent) {
+      setLoading(true);
+      setError("");
+    }
     try {
-      let response;
       if (preferNetwork && navigator.onLine) {
-        response = await fetch(FIFA_FIXTURE_URL, { headers: { accept: "application/json" } });
-        if (!response.ok) throw new Error(`FIFA API ${response.status}`);
+        const data = await fetchFifaJson(FIFA_FIXTURE_URL);
+        const normalized = data.Results.map(toMatch).sort(compareMatchesByKickoff);
+        setMatches(normalized);
+        setUpdatedAt(new Date());
+        localStorage.setItem("fixture-cache", JSON.stringify({ savedAt: Date.now(), data }));
         setSource("FIFA API");
       } else {
         throw new Error("offline");
       }
-      const data = await response.json();
-      const normalized = data.Results.map(toMatch).sort(compareMatchesByKickoff);
-      setMatches(normalized);
-      setUpdatedAt(new Date());
-      localStorage.setItem("fixture-cache", JSON.stringify({ savedAt: Date.now(), data }));
     } catch (networkError) {
+      if (silent) return;
       try {
         const cached = localStorage.getItem("fixture-cache");
         const data = cached
@@ -204,15 +256,100 @@ function useFixture() {
         setError("No se pudo cargar el fixture.");
       }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     loadFixture();
-  }, []);
+  }, [loadFixture]);
+
+  const hasLiveMatch = matches.some((match) => match.statusTone === "live");
+
+  useEffect(() => {
+    const refreshInterval = hasLiveMatch ? LIVE_FIXTURE_REFRESH_MS : IDLE_FIXTURE_REFRESH_MS;
+    const refreshSilently = () => {
+      if (navigator.onLine && documentIsVisible()) {
+        loadFixture(true, { silent: true });
+      }
+    };
+    const intervalId = window.setInterval(refreshSilently, refreshInterval);
+    const handleVisibilityChange = () => {
+      if (documentIsVisible()) refreshSilently();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [hasLiveMatch, loadFixture]);
 
   return { matches, source, loading, error, updatedAt, refresh: () => loadFixture(true) };
+}
+
+function useMatchFeed(match) {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const requestIdRef = useRef(0);
+
+  const loadTimeline = useCallback(async (options = {}) => {
+    if (!match?.id) return;
+    const silent = options.silent === true;
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+
+    if (!silent) {
+      setLoading(true);
+      setError("");
+    }
+    try {
+      const data = await fetchFifaJson(`${FIFA_TIMELINE_URL}/${match.id}?language=es`);
+      if (requestIdRef.current !== requestId) return;
+      setEvents(data.Event || []);
+    } catch {
+      if (requestIdRef.current !== requestId) return;
+      if (!silent) {
+        setEvents([]);
+        setError("No se pudo cargar la cronología en vivo.");
+      }
+    } finally {
+      if (requestIdRef.current === requestId && !silent) setLoading(false);
+    }
+  }, [match?.id]);
+
+  useEffect(() => {
+    loadTimeline();
+  }, [loadTimeline]);
+
+  useEffect(() => {
+    if (!match?.id) return undefined;
+    const detailInterval = match.statusTone === "live" ? LIVE_DETAIL_REFRESH_MS : IDLE_DETAIL_REFRESH_MS;
+    const refreshSilently = () => {
+      if (navigator.onLine && documentIsVisible()) {
+        loadTimeline({ silent: true });
+      }
+    };
+    const intervalId = window.setInterval(refreshSilently, detailInterval);
+    const handleVisibilityChange = () => {
+      if (documentIsVisible()) refreshSilently();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [loadTimeline, match?.id, match?.statusTone]);
+
+  return {
+    liveMatch: match?.raw || null,
+    events,
+    loading,
+    error,
+    refresh: () => loadTimeline()
+  };
 }
 
 function useTimeline(match) {
@@ -227,9 +364,7 @@ function useTimeline(match) {
       setLoading(true);
       setStatus("idle");
       try {
-        const response = await fetch(`${FIFA_TIMELINE_URL}/${match.id}?language=es`);
-        if (!response.ok) throw new Error(`Timeline ${response.status}`);
-        const data = await response.json();
+        const data = await fetchFifaJson(`${FIFA_TIMELINE_URL}/${match.id}?language=es`);
         if (!active) return;
         setEvents((data.Event || []).slice().reverse().slice(0, 8));
         setStatus("ok");
@@ -248,53 +383,6 @@ function useTimeline(match) {
   }, [match?.id]);
 
   return { events, loading, status };
-}
-
-function useMatchFeed(match) {
-  const [liveMatch, setLiveMatch] = useState(null);
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let active = true;
-    async function load() {
-      if (!match?.id) return;
-      setLoading(true);
-      setError("");
-      try {
-        const [liveResult, timelineResult] = await Promise.allSettled([
-          fetch(`${FIFA_LIVE_URL}/${match.id}?language=es`).then((response) => {
-            if (!response.ok) throw new Error(`Live ${response.status}`);
-            return response.json();
-          }),
-          fetch(`${FIFA_TIMELINE_URL}/${match.id}?language=es`).then((response) => {
-            if (!response.ok) throw new Error(`Timeline ${response.status}`);
-            return response.json();
-          })
-        ]);
-        if (!active) return;
-        setLiveMatch(liveResult.status === "fulfilled" && liveResult.value?.IdMatch ? liveResult.value : null);
-        setEvents(timelineResult.status === "fulfilled" ? timelineResult.value?.Event || [] : []);
-        if (liveResult.status === "rejected" && timelineResult.status === "rejected") {
-          setError("No se pudo cargar el detalle en vivo.");
-        }
-      } catch {
-        if (!active) return;
-        setLiveMatch(null);
-        setEvents([]);
-        setError("No se pudo cargar el detalle en vivo.");
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      active = false;
-    };
-  }, [match?.id]);
-
-  return { liveMatch, events, loading, error };
 }
 
 function groupByDate(matches) {
@@ -1021,14 +1109,26 @@ function TeamCell({ name, code, flag, align = "left" }) {
 
 function MatchScreen({ match, onBack, source, refresh, loading }) {
   const [tab, setTab] = useState("datos");
-  const { liveMatch, events, loading: detailLoading, error } = useMatchFeed(match);
+  const { liveMatch, events, loading: detailLoading, error, refresh: refreshDetail } = useMatchFeed(match);
   const matchUrl = `${MATCH_CENTRE_BASE}/${match.competitionId}/${match.seasonId}/${match.stageId}/${match.id}`;
+  const liveRaw = liveMatch || match.raw;
+  const homeScore = scoreFromRaw(match, liveRaw, "home");
+  const awayScore = scoreFromRaw(match, liveRaw, "away");
+  const currentTone = liveMatchTone(match, liveRaw);
+  const currentStatus = liveMatchLabel(match, liveRaw);
+  const scoreMeta =
+    currentTone === "live"
+      ? [detailClockLabel(match, liveRaw), match.stage, match.group].filter(Boolean).join(" · ")
+      : `${formatDate(match.date, { weekday: "short", day: "2-digit", month: "short" })} · ${timeLabel(match)}`;
   const tabs = [
     ["datos", "Datos", ClipboardList],
     ["stats", "Estadísticas", BarChart3],
     ["formacion", "Formación", Shirt],
     ["cronologia", "Cronología", ListChecks]
   ];
+  async function handleRefresh() {
+    await Promise.allSettled([refresh(), refreshDetail()]);
+  }
 
   return (
     <main className="app-shell match-screen">
@@ -1042,8 +1142,8 @@ function MatchScreen({ match, onBack, source, refresh, loading }) {
             {navigator.onLine ? <Wifi size={15} /> : <WifiOff size={15} />}
             {source}
           </span>
-          <button className="icon-button" onClick={refresh} disabled={loading} title="Actualizar">
-            <RefreshCw size={18} className={loading ? "spin" : ""} />
+          <button className="icon-button" onClick={handleRefresh} disabled={loading || detailLoading} title="Actualizar">
+            <RefreshCw size={18} className={loading || detailLoading ? "spin" : ""} />
             <span>Actualizar</span>
           </button>
         </div>
@@ -1053,7 +1153,7 @@ function MatchScreen({ match, onBack, source, refresh, loading }) {
 
       <section className="match-hero">
         <div className="match-context">
-          <span className={`status-pill ${match.statusTone}`}>{match.statusLabel}</span>
+          <span className={`status-pill ${currentTone}`}>{currentStatus}</span>
           <span>Partido {match.matchNumber}</span>
           <span>{match.stage}</span>
           {match.group && <span>{match.group}</span>}
@@ -1062,12 +1162,9 @@ function MatchScreen({ match, onBack, source, refresh, loading }) {
           <DetailTeam match={match} side="home" />
           <div className="hero-scoreline">
             <strong>
-              {match.homeScore ?? "-"} : {match.awayScore ?? "-"}
+              {homeScore ?? "-"} : {awayScore ?? "-"}
             </strong>
-            <span>
-              {formatDate(match.date, { weekday: "short", day: "2-digit", month: "short" })} ·{" "}
-              {timeLabel(match)}
-            </span>
+            <span>{scoreMeta}</span>
           </div>
           <DetailTeam match={match} side="away" />
         </div>
@@ -1107,7 +1204,7 @@ function MatchFacts({ match, liveMatch }) {
   const officials = liveMatch?.Officials || match.officials || [];
   const referee = officials.find((official) => localized(official.TypeLocalized).toLowerCase().includes("árbitro")) || officials[0];
   const attendance = liveMatch?.Attendance ?? match.attendance;
-  const period = liveMatch?.MatchTime || (match.statusTone === "played" ? "Finalizado" : "Programado");
+  const period = detailClockLabel(match, liveMatch || match.raw);
 
   return (
     <div className="facts-grid">
@@ -1141,6 +1238,9 @@ function eventTeamStats(events, match) {
 
 function MatchStats({ match, liveMatch, events }) {
   const stats = eventTeamStats(events, match);
+  const liveRaw = liveMatch || match.raw;
+  const homeScore = scoreFromRaw(match, liveRaw, "home");
+  const awayScore = scoreFromRaw(match, liveRaw, "away");
   const rows = [
     ["Goles detectados", stats.home.goals, stats.away.goals],
     ["Tarjetas", stats.home.cards, stats.away.cards],
@@ -1155,7 +1255,7 @@ function MatchStats({ match, liveMatch, events }) {
       <div className="stat-card primary">
         <span>Marcador</span>
         <strong>
-          {match.homeScore ?? "-"} - {match.awayScore ?? "-"}
+          {homeScore ?? "-"} - {awayScore ?? "-"}
         </strong>
         <small>
           {match.homeCode} vs {match.awayCode}
@@ -1163,7 +1263,7 @@ function MatchStats({ match, liveMatch, events }) {
       </div>
       <div className="stat-card">
         <span>Minuto / periodo</span>
-        <strong>{liveMatch?.MatchTime || (match.statusTone === "played" ? "FT" : "--")}</strong>
+        <strong>{detailClockLabel(match, liveRaw)}</strong>
         <small>{liveMatch?.Period ? `Periodo ${liveMatch.Period}` : "Dato FIFA"}</small>
       </div>
       <div className="stat-card">
