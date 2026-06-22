@@ -369,7 +369,13 @@ function App() {
 
   const grouped = groupByDate(filteredMatches);
   const playedCount = matches.filter((match) => match.statusTone === "played").length;
-  const liveCount = matches.filter((match) => match.statusTone === "live").length;
+  const liveCount = liveMatches.length;
+
+  useEffect(() => {
+    if (status === "live" && liveCount === 0) {
+      setStatus("all");
+    }
+  }, [liveCount, status]);
 
   async function installApp() {
     if (!installPrompt) return;
@@ -470,6 +476,7 @@ function App() {
             setQuery={setQuery}
             phases={phases}
             groups={groups}
+            showLiveFilter={liveCount > 0}
           />
           <div className="match-list" aria-live="polite">
             {loading && !matches.length ? (
@@ -623,14 +630,14 @@ function MatchSpotlight({ liveMatches, nextMatch, onOpen }) {
 function Filters(props) {
   const statusOptions = [
     ["all", "Todos"],
-    ["live", "En vivo"],
+    ...(props.showLiveFilter ? [["live", "En vivo"]] : []),
     ["played", "Jugados"],
     ["upcoming", "Próximos"]
   ];
 
   return (
     <div className="filters">
-      <div className="segmented" role="tablist" aria-label="Estado">
+      <div className={`segmented options-${statusOptions.length}`} role="tablist" aria-label="Estado">
         {statusOptions.map(([value, label]) => (
           <button
             key={value}

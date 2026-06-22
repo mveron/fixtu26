@@ -430,6 +430,14 @@ p {
   border: 1px solid var(--line);
 }
 
+.segmented.options-3 {
+  grid-template-columns: repeat(3, minmax(72px, 1fr));
+}
+
+.segmented.options-4 {
+  grid-template-columns: repeat(4, minmax(72px, 1fr));
+}
+
 .segmented button {
   border: 0;
   border-radius: 6px;
@@ -1446,6 +1454,14 @@ p {
 
   .segmented {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .segmented.options-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .segmented.options-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .match-list {
