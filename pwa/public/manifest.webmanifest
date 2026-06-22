@@ -1,9 +1,9 @@
 {
   "id": "/",
-  "name": "Fixtu26 - Fixture Mundial 2026",
+  "name": "Fixtu26 - World Cup 2026 Fixture",
   "short_name": "Fixtu26",
-  "description": "PWA para seguir partidos, grupos, tablas, estados en vivo y detalles de la FIFA World Cup 2026.",
-  "lang": "es-AR",
+  "description": "PWA to follow FIFA World Cup 2026 matches, groups, standings, live status and match details.",
+  "lang": "en-US",
   "dir": "ltr",
   "start_url": "/?source=pwa",
   "scope": "/",
@@ -52,28 +52,28 @@
       "sizes": "390x844",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Fixture con partidos en vivo y próximos encuentros"
+      "label": "Fixture with live matches and upcoming games"
     },
     {
       "src": "/screenshots/groups-mobile.png",
       "sizes": "390x844",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Grupos y tabla de posiciones"
+      "label": "Groups and standings"
     },
     {
       "src": "/screenshots/fixture-wide.png",
       "sizes": "1280x900",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Fixture Mundial 2026 en escritorio"
+      "label": "World Cup 2026 fixture on desktop"
     }
   ],
   "shortcuts": [
     {
       "name": "Fixture",
       "short_name": "Fixture",
-      "description": "Abrir el fixture de partidos",
+      "description": "Open the match fixture",
       "url": "/?view=fixture&source=shortcut",
       "icons": [
         {
@@ -84,9 +84,9 @@
       ]
     },
     {
-      "name": "Partidos en vivo",
-      "short_name": "En vivo",
-      "description": "Ver partidos en vivo",
+      "name": "Live matches",
+      "short_name": "Live",
+      "description": "View live matches",
       "url": "/?view=fixture&status=live&source=shortcut",
       "icons": [
         {
@@ -97,9 +97,9 @@
       ]
     },
     {
-      "name": "Grupos",
-      "short_name": "Grupos",
-      "description": "Abrir grupos y tabla de posiciones",
+      "name": "Groups",
+      "short_name": "Groups",
+      "description": "Open groups and standings",
       "url": "/?view=groups&source=shortcut",
       "icons": [
         {

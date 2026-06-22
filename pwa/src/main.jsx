@@ -27,17 +27,342 @@ import {
 } from "lucide-react";
 import "./styles.css";
 
-const FIFA_FIXTURE_URL =
-  "https://api.fifa.com/api/v3/calendar/matches?language=es&count=500&idSeason=285023";
-const FIFA_LIVE_FEED_URL =
-  "https://api.fifa.com/api/v3/live/football?language=es&count=500&idSeason=285023";
+const FIFA_API_BASE = "https://api.fifa.com/api/v3";
 const FIFA_TIMELINE_URL = "https://api.fifa.com/api/v3/timelines";
-const MATCH_CENTRE_BASE = "https://www.fifa.com/es/match-centre/match";
+const FIFA_SEASON_ID = "285023";
+const FIFA_MATCH_CENTRE_BASE = "https://www.fifa.com";
 const TIME_ZONE = "America/Buenos_Aires";
 const LIVE_FIXTURE_REFRESH_MS = 15000;
 const IDLE_FIXTURE_REFRESH_MS = 60000;
 const LIVE_DETAIL_REFRESH_MS = 10000;
 const IDLE_DETAIL_REFRESH_MS = 60000;
+const LIVE_MATCH_STATUSES = new Set([3, 11]);
+
+const I18N = {
+  en: {
+    code: "en",
+    fifaLanguage: "en",
+    fifaPath: "en",
+    locale: "en-US",
+    htmlLang: "en",
+    sourceLoading: "Loading",
+    sourceFifa: "FIFA API",
+    sourceCache: "Local cache",
+    sourceSnapshot: "Offline snapshot",
+    title: "World Cup 2026 Fixture",
+    tagline: "Matches, groups, status and real-time detail",
+    refresh: "Refresh",
+    install: "Install",
+    installPwa: "Install PWA",
+    fixture: "Fixture",
+    groups: "Groups",
+    mainViews: "Main views",
+    matches: "matches",
+    played: "played",
+    live: "live",
+    lastLoad: "last load",
+    status: {
+      played: "Played",
+      live: "Live",
+      upcoming: "Upcoming",
+      scheduled: "Scheduled"
+    },
+    statusFilters: {
+      all: "All",
+      live: "Live",
+      played: "Played",
+      upcoming: "Upcoming"
+    },
+    filters: {
+      status: "Status",
+      stage: "Stage",
+      allStages: "All",
+      group: "Group",
+      allGroups: "All",
+      search: "Search"
+    },
+    noMatchesTitle: "No matches for those filters",
+    noMatchesBody: "Try changing stage, group or search.",
+    noGroupsTitle: "No groups published",
+    noGroupsBody: "When FIFA publishes the group stage, it will appear here.",
+    teams: "Teams",
+    standings: "Standings",
+    pointsTable: "Points table",
+    table: {
+      team: "Team",
+      played: "P",
+      won: "W",
+      drawn: "D",
+      lost: "L",
+      goalsFor: "GF",
+      goalsAgainst: "GA",
+      goalDiff: "GD",
+      points: "Pts"
+    },
+    spotlightLive: "Live match",
+    spotlightNext: "Next match",
+    venueTbd: "Venue TBD",
+    liveMatches: "Live matches",
+    previousLive: "Previous live match",
+    nextLive: "Next live match",
+    stageTbd: "Stage TBD",
+    match: "Match",
+    matchNumber: "Match",
+    detail: {
+      facts: "Facts",
+      stats: "Stats",
+      lineup: "Lineup",
+      timeline: "Timeline",
+      loading: "Loading match data...",
+      matchDetail: "Match detail"
+    },
+    facts: {
+      date: "Date",
+      stadium: "Stadium",
+      stage: "Stage",
+      status: "Status",
+      referee: "Referee",
+      attendance: "Attendance"
+    },
+    stadiumTbd: "Stadium TBD",
+    cityTbd: "City TBD",
+    tbd: "TBD",
+    notPublished: "Not published",
+    noAttendance: "Not published",
+    noReferee: "Not published",
+    final: "Finished",
+    scheduled: "Scheduled",
+    fifaData: "FIFA data",
+    stats: {
+      score: "Score",
+      minutePeriod: "Minute / period",
+      period: "Period",
+      possession: "Possession",
+      available: "Available",
+      unavailable: "--",
+      published: "Published by FIFA",
+      notPublished: "Not published for this match",
+      statistic: "Statistic",
+      goalsDetected: "Goals detected",
+      cards: "Cards",
+      fouls: "Fouls recorded",
+      substitutions: "Substitutions",
+      fifaEvents: "FIFA events"
+    },
+    positions: {
+      goalkeeper: "Goalkeeper",
+      defender: "Defender",
+      midfielder: "Midfielder",
+      forward: "Forward",
+      squad: "Squad"
+    },
+    formation: {
+      empty: "FIFA has not published this team's starting lineup yet.",
+      bench: "Substitutes",
+      aria: "Lineup for"
+    },
+    timeline: {
+      empty: "The timeline appears when FIFA publishes match events.",
+      error: "Could not load the timeline.",
+      event: "Event"
+    },
+    selectMatch: "Select a match",
+    knockout: "Knockout",
+    goal: "Goal",
+    apiErrors: {
+      refresh: "Could not refresh FIFA API; using local cache.",
+      fixture: "Could not load the fixture.",
+      detail: "Could not load live match details."
+    },
+    refereeNeedles: ["referee", "árbitro"],
+    eventNeedles: {
+      goal: ["goal", "gol"],
+      card: ["card", "tarjeta"],
+      foul: ["foul", "falta"],
+      substitution: ["substitution", "substitute", "cambio", "sustit"]
+    }
+  },
+  es: {
+    code: "es",
+    fifaLanguage: "es",
+    fifaPath: "es",
+    locale: "es-AR",
+    htmlLang: "es",
+    sourceLoading: "Cargando",
+    sourceFifa: "FIFA API",
+    sourceCache: "Cache local",
+    sourceSnapshot: "Snapshot offline",
+    title: "Fixture Mundial 2026",
+    tagline: "Partidos, grupos, estados y detalle en tiempo real",
+    refresh: "Actualizar",
+    install: "Instalar",
+    installPwa: "Instalar PWA",
+    fixture: "Fixture",
+    groups: "Grupos",
+    mainViews: "Vistas principales",
+    matches: "partidos",
+    played: "jugados",
+    live: "en vivo",
+    lastLoad: "ultima carga",
+    status: {
+      played: "Jugado",
+      live: "En vivo",
+      upcoming: "Próximo",
+      scheduled: "Programado"
+    },
+    statusFilters: {
+      all: "Todos",
+      live: "En vivo",
+      played: "Jugados",
+      upcoming: "Próximos"
+    },
+    filters: {
+      status: "Estado",
+      stage: "Fase",
+      allStages: "Todas",
+      group: "Grupo",
+      allGroups: "Todos",
+      search: "Buscar"
+    },
+    noMatchesTitle: "No hay partidos para esos filtros",
+    noMatchesBody: "Probá cambiar fase, grupo o búsqueda.",
+    noGroupsTitle: "No hay grupos publicados",
+    noGroupsBody: "Cuando FIFA publique la fase de grupos, aparecerán acá.",
+    teams: "Equipos",
+    standings: "Tabla de posiciones",
+    pointsTable: "Tabla de posiciones",
+    table: {
+      team: "Equipo",
+      played: "PJ",
+      won: "G",
+      drawn: "E",
+      lost: "P",
+      goalsFor: "GF",
+      goalsAgainst: "GC",
+      goalDiff: "DG",
+      points: "Pts"
+    },
+    spotlightLive: "Partido en vivo",
+    spotlightNext: "Próximo partido",
+    venueTbd: "Sede por definir",
+    liveMatches: "Partidos en vivo",
+    previousLive: "Partido en vivo anterior",
+    nextLive: "Siguiente partido en vivo",
+    stageTbd: "Fase por definir",
+    match: "Partido",
+    matchNumber: "Partido",
+    detail: {
+      facts: "Datos",
+      stats: "Estadísticas",
+      lineup: "Formación",
+      timeline: "Cronología",
+      loading: "Cargando datos del partido...",
+      matchDetail: "Detalle del partido"
+    },
+    facts: {
+      date: "Fecha",
+      stadium: "Estadio",
+      stage: "Fase",
+      status: "Estado",
+      referee: "Árbitro",
+      attendance: "Asistencia"
+    },
+    stadiumTbd: "Estadio por definir",
+    cityTbd: "Ciudad por definir",
+    tbd: "TBC",
+    notPublished: "No publicado",
+    noAttendance: "No publicada",
+    noReferee: "No publicado",
+    final: "Finalizado",
+    scheduled: "Programado",
+    fifaData: "Dato FIFA",
+    stats: {
+      score: "Marcador",
+      minutePeriod: "Minuto / periodo",
+      period: "Periodo",
+      possession: "Posesión",
+      available: "Disponible",
+      unavailable: "--",
+      published: "Publicada por FIFA",
+      notPublished: "No publicada para este partido",
+      statistic: "Estadística",
+      goalsDetected: "Goles detectados",
+      cards: "Tarjetas",
+      fouls: "Faltas registradas",
+      substitutions: "Cambios",
+      fifaEvents: "Eventos FIFA"
+    },
+    positions: {
+      goalkeeper: "Arquero",
+      defender: "Defensa",
+      midfielder: "Medio",
+      forward: "Delantero",
+      squad: "Plantel"
+    },
+    formation: {
+      empty: "FIFA todavía no publicó la formación inicial de este equipo.",
+      bench: "Suplentes",
+      aria: "Formación de"
+    },
+    timeline: {
+      empty: "La cronología aparece cuando FIFA publica eventos del partido.",
+      error: "No se pudo cargar la cronología.",
+      event: "Evento"
+    },
+    selectMatch: "Seleccioná un partido",
+    knockout: "Eliminatoria",
+    goal: "Gol",
+    apiErrors: {
+      refresh: "No se pudo refrescar FIFA API; se usa cache local.",
+      fixture: "No se pudo cargar el fixture.",
+      detail: "No se pudo cargar el detalle en vivo."
+    },
+    refereeNeedles: ["árbitro", "referee"],
+    eventNeedles: {
+      goal: ["gol", "goal"],
+      card: ["tarjeta", "card"],
+      foul: ["falta", "foul"],
+      substitution: ["sustit", "cambio", "substitution", "substitute"]
+    }
+  }
+};
+
+const LanguageContext = React.createContext({ language: "en", i18n: I18N.en });
+
+function useLanguage() {
+  return React.useContext(LanguageContext);
+}
+
+function resolveLanguage(value) {
+  return String(value || "").toLowerCase().startsWith("es") ? "es" : "en";
+}
+
+function detectUserLanguage() {
+  const params = new URLSearchParams(window.location.search);
+  const urlLanguage = params.get("lang");
+  if (urlLanguage) return resolveLanguage(urlLanguage);
+  const browserLanguages = navigator.languages?.length ? navigator.languages : [navigator.language];
+  return resolveLanguage(browserLanguages.find(Boolean));
+}
+
+function languageConfig(language) {
+  return I18N[language] || I18N.en;
+}
+
+function fifaUrl(path, language) {
+  const { fifaLanguage } = languageConfig(language);
+  return `${FIFA_API_BASE}/${path}?language=${fifaLanguage}&count=500&idSeason=${FIFA_SEASON_ID}`;
+}
+
+function timelineUrl(matchId, language) {
+  const { fifaLanguage } = languageConfig(language);
+  return `${FIFA_TIMELINE_URL}/${matchId}?language=${fifaLanguage}`;
+}
+
+function matchCentreBase(language) {
+  const { fifaPath } = languageConfig(language);
+  return `${FIFA_MATCH_CENTRE_BASE}/${fifaPath}/match-centre/match`;
+}
 
 function freshUrl(url) {
   const separator = url.includes("?") ? "&" : "?";
@@ -57,57 +382,60 @@ function documentIsVisible() {
   return typeof document === "undefined" || document.visibilityState !== "hidden";
 }
 
-function localized(value, locale = "es-ES") {
+function localized(value, language = "en") {
   if (!Array.isArray(value)) return "";
+  const { locale, code } = languageConfig(language);
   return (
     value.find((entry) => entry.Locale === locale)?.Description ??
+    value.find((entry) => String(entry.Locale || "").toLowerCase().startsWith(code))?.Description ??
     value[0]?.Description ??
     ""
   );
 }
 
-function teamName(team, placeholder) {
-  return localized(team?.TeamName) || team?.Abbreviation || placeholder || "Por definir";
+function teamName(team, placeholder, language = "en") {
+  return localized(team?.TeamName, language) || team?.Abbreviation || placeholder || languageConfig(language).tbd;
 }
 
 function teamCode(team, placeholder) {
   return team?.Abbreviation || placeholder || "TBD";
 }
 
-function personName(value) {
-  return localized(value?.Name) || localized(value?.NameShort) || localized(value?.PlayerName) || "";
+function personName(value, language = "en") {
+  return localized(value?.Name, language) || localized(value?.NameShort, language) || localized(value?.PlayerName, language) || "";
 }
 
-function playerName(player) {
-  return localized(player?.PlayerName) || localized(player?.ShortName) || "Jugador";
+function playerName(player, language = "en") {
+  return localized(player?.PlayerName, language) || localized(player?.ShortName, language) || languageConfig(language).positions.squad;
 }
 
 function scoreValue(teamScore, fallback) {
   return teamScore ?? fallback ?? null;
 }
 
-function statusLabel(status) {
-  if (status === 0) return "Jugado";
-  if (status === 3) return "En vivo";
-  if (status === 1) return "Próximo";
-  return "Programado";
+function statusLabel(status, language = "en") {
+  const { status: labels } = languageConfig(language);
+  if (status === 0) return labels.played;
+  if (LIVE_MATCH_STATUSES.has(status)) return labels.live;
+  if (status === 1) return labels.upcoming;
+  return labels.scheduled;
 }
 
 function statusTone(status) {
   if (status === 0) return "played";
-  if (status === 3) return "live";
+  if (LIVE_MATCH_STATUSES.has(status)) return "live";
   if (status === 1) return "upcoming";
   return "scheduled";
 }
 
-function toMatch(raw) {
+function toMatch(raw, language = "en") {
   const homeScore = scoreValue(raw.Home?.Score, raw.HomeTeamScore);
   const awayScore = scoreValue(raw.Away?.Score, raw.AwayTeamScore);
   const status = raw.MatchStatus;
-  const stage = localized(raw.StageName);
-  const group = localized(raw.GroupName);
-  const stadium = localized(raw.Stadium?.Name);
-  const city = localized(raw.Stadium?.CityName);
+  const stage = localized(raw.StageName, language);
+  const group = localized(raw.GroupName, language);
+  const stadium = localized(raw.Stadium?.Name, language);
+  const city = localized(raw.Stadium?.CityName, language);
 
   return {
     id: raw.IdMatch,
@@ -120,15 +448,15 @@ function toMatch(raw) {
     localDate: raw.LocalDate,
     timeDefined: raw.TimeDefined,
     status,
-    statusLabel: statusLabel(status),
+    statusLabel: statusLabel(status, language),
     statusTone: statusTone(status),
     stage,
     group,
     stadium,
     city,
     country: raw.Stadium?.IdCountry || "",
-    homeName: teamName(raw.Home, raw.PlaceHolderA),
-    awayName: teamName(raw.Away, raw.PlaceHolderB),
+    homeName: teamName(raw.Home, raw.PlaceHolderA, language),
+    awayName: teamName(raw.Away, raw.PlaceHolderB, language),
     homeCode: teamCode(raw.Home, raw.PlaceHolderA),
     awayCode: teamCode(raw.Away, raw.PlaceHolderB),
     homeFlag: raw.Home?.PictureUrl,
@@ -150,30 +478,30 @@ function flagUrl(template) {
   return template?.replace("{format}", "sq").replace("{size}", "4");
 }
 
-function formatDate(iso, options = {}) {
+function formatDate(iso, options = {}, language = "en") {
   if (!iso) return "";
-  return new Intl.DateTimeFormat("es-AR", {
+  return new Intl.DateTimeFormat(languageConfig(language).locale, {
     timeZone: TIME_ZONE,
     ...options
   }).format(new Date(iso));
 }
 
-function dateKey(iso) {
+function dateKey(iso, language = "en") {
   return formatDate(iso, {
     weekday: "long",
     day: "2-digit",
     month: "long"
-  });
+  }, language);
 }
 
-function timeLabel(match) {
-  if (!match.timeDefined) return "TBC";
+function timeLabel(match, language = "en") {
+  if (!match.timeDefined) return languageConfig(language).tbd;
   return formatDate(match.date, {
     hour12: false,
     hourCycle: "h23",
     hour: "2-digit",
     minute: "2-digit"
-  });
+  }, language);
 }
 
 function kickoffTime(match) {
@@ -185,12 +513,12 @@ function compareMatchesByKickoff(a, b) {
   return kickoffTime(a) - kickoffTime(b) || a.matchNumber - b.matchNumber;
 }
 
-function liveClockFromRaw(raw) {
-  return raw?.MatchTime || raw?.MatchMinute || raw?.MatchClock || "En vivo";
+function liveClockFromRaw(raw, language = "en") {
+  return raw?.MatchTime || raw?.MatchMinute || raw?.MatchClock || languageConfig(language).status.live;
 }
 
-function liveClockLabel(match) {
-  return liveClockFromRaw(match.raw);
+function liveClockLabel(match, language = "en") {
+  return liveClockFromRaw(match.raw, language);
 }
 
 function scoreFromRaw(match, raw, side) {
@@ -234,15 +562,16 @@ function liveMatchTone(match, raw) {
   return statusTone(liveMatchStatus(match, raw));
 }
 
-function liveMatchLabel(match, raw) {
-  return statusLabel(liveMatchStatus(match, raw));
+function liveMatchLabel(match, raw, language = "en") {
+  return statusLabel(liveMatchStatus(match, raw), language);
 }
 
-function detailClockLabel(match, raw) {
+function detailClockLabel(match, raw, language = "en") {
   const tone = liveMatchTone(match, raw);
-  if (tone === "live") return liveClockFromRaw(raw);
-  if (tone === "played") return "Finalizado";
-  return "Programado";
+  const i18n = languageConfig(language);
+  if (tone === "live") return liveClockFromRaw(raw, language);
+  if (tone === "played") return i18n.final;
+  return i18n.scheduled;
 }
 
 function normalizedScore(value) {
@@ -283,6 +612,7 @@ function useScorePulse(matchKey, homeScore, awayScore) {
 }
 
 function AnimatedScore({ homeScore, awayScore, goalSide, separator = ":", compact = false }) {
+  const { i18n } = useLanguage();
   const hasScore = homeScore !== null || awayScore !== null;
 
   if (!hasScore) {
@@ -301,17 +631,19 @@ function AnimatedScore({ homeScore, awayScore, goalSide, separator = ":", compac
       <span className={`score-number away ${goalSide === "away" ? "score-goal" : ""}`}>
         {awayScore ?? "-"}
       </span>
-      {goalSide && <span className="goal-flash">Gol</span>}
+      {goalSide && <span className="goal-flash">{i18n.goal}</span>}
     </strong>
   );
 }
 
-function useFixture() {
+function useFixture(language) {
+  const i18n = languageConfig(language);
   const [matches, setMatches] = useState([]);
-  const [source, setSource] = useState("Cargando");
+  const [source, setSource] = useState(i18n.sourceLoading);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatedAt, setUpdatedAt] = useState(null);
+  const cacheKey = `fixture-cache-${language}`;
 
   const loadFixture = useCallback(async (preferNetwork = true, options = {}) => {
     const silent = options.silent === true;
@@ -321,33 +653,33 @@ function useFixture() {
     }
     try {
       if (preferNetwork && navigator.onLine) {
-        const data = await fetchFifaJson(FIFA_FIXTURE_URL);
-        const normalized = data.Results.map(toMatch).sort(compareMatchesByKickoff);
+        const data = await fetchFifaJson(fifaUrl("calendar/matches", language));
+        const normalized = data.Results.map((raw) => toMatch(raw, language)).sort(compareMatchesByKickoff);
         setMatches(normalized);
         setUpdatedAt(new Date());
-        localStorage.setItem("fixture-cache", JSON.stringify({ savedAt: Date.now(), data }));
-        setSource("FIFA API");
+        localStorage.setItem(cacheKey, JSON.stringify({ savedAt: Date.now(), data }));
+        setSource(i18n.sourceFifa);
       } else {
         throw new Error("offline");
       }
     } catch (networkError) {
       if (silent) return;
       try {
-        const cached = localStorage.getItem("fixture-cache");
+        const cached = localStorage.getItem(cacheKey);
         const data = cached
           ? JSON.parse(cached).data
           : await fetch("/fixture-seed.json").then((response) => response.json());
-        setMatches(data.Results.map(toMatch).sort(compareMatchesByKickoff));
-        setSource(cached ? "Cache local" : "Snapshot offline");
+        setMatches(data.Results.map((raw) => toMatch(raw, language)).sort(compareMatchesByKickoff));
+        setSource(cached ? i18n.sourceCache : i18n.sourceSnapshot);
         setUpdatedAt(cached ? new Date(JSON.parse(cached).savedAt) : null);
-        if (preferNetwork) setError("No se pudo refrescar FIFA API; se usa cache local.");
+        if (preferNetwork) setError(i18n.apiErrors.refresh);
       } catch (fallbackError) {
-        setError("No se pudo cargar el fixture.");
+        setError(i18n.apiErrors.fixture);
       }
     } finally {
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [cacheKey, i18n, language]);
 
   useEffect(() => {
     loadFixture();
@@ -378,6 +710,7 @@ function useFixture() {
 }
 
 function useMatchFeed(match) {
+  const { language, i18n } = useLanguage();
   const [liveMatch, setLiveMatch] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -396,8 +729,8 @@ function useMatchFeed(match) {
     }
     try {
       const [liveResult, timelineResult] = await Promise.allSettled([
-        fetchFifaJson(FIFA_LIVE_FEED_URL),
-        fetchFifaJson(`${FIFA_TIMELINE_URL}/${match.id}?language=es`)
+        fetchFifaJson(fifaUrl("live/football", language)),
+        fetchFifaJson(timelineUrl(match.id, language))
       ]);
       if (requestIdRef.current !== requestId) return;
 
@@ -407,19 +740,19 @@ function useMatchFeed(match) {
       setEvents(timelineResult.status === "fulfilled" ? timelineResult.value.Event || [] : []);
 
       if (liveResult.status === "rejected" && timelineResult.status === "rejected" && !silent) {
-        setError("No se pudo cargar el detalle en vivo.");
+        setError(i18n.apiErrors.detail);
       }
     } catch {
       if (requestIdRef.current !== requestId) return;
       if (!silent) {
         setLiveMatch(match.raw);
         setEvents([]);
-        setError("No se pudo cargar el detalle en vivo.");
+        setError(i18n.apiErrors.detail);
       }
     } finally {
       if (requestIdRef.current === requestId && !silent) setLoading(false);
     }
-  }, [match]);
+  }, [i18n, language, match]);
 
   useEffect(() => {
     setLiveMatch(match?.raw || null);
@@ -456,6 +789,7 @@ function useMatchFeed(match) {
 }
 
 function useTimeline(match) {
+  const { language } = useLanguage();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("idle");
@@ -467,7 +801,7 @@ function useTimeline(match) {
       setLoading(true);
       setStatus("idle");
       try {
-        const data = await fetchFifaJson(`${FIFA_TIMELINE_URL}/${match.id}?language=es`);
+        const data = await fetchFifaJson(timelineUrl(match.id, language));
         if (!active) return;
         setEvents((data.Event || []).slice().reverse().slice(0, 8));
         setStatus("ok");
@@ -483,14 +817,14 @@ function useTimeline(match) {
     return () => {
       active = false;
     };
-  }, [match?.id]);
+  }, [language, match?.id]);
 
   return { events, loading, status };
 }
 
-function groupByDate(matches) {
+function groupByDate(matches, language = "en") {
   return matches.reduce((groups, match) => {
-    const key = dateKey(match.date);
+    const key = dateKey(match.date, language);
     if (!groups[key]) groups[key] = [];
     groups[key].push(match);
     return groups;
@@ -542,16 +876,18 @@ function applyResult(team, goalsFor, goalsAgainst) {
   }
 }
 
-function compareStandings(a, b) {
+function compareStandings(a, b, language = "en") {
+  const { locale } = languageConfig(language);
   return (
     b.points - a.points ||
     b.goalDiff - a.goalDiff ||
     b.goalsFor - a.goalsFor ||
-    a.name.localeCompare(b.name, "es")
+    a.name.localeCompare(b.name, locale)
   );
 }
 
-function buildGroups(matches) {
+function buildGroups(matches, language = "en") {
+  const { locale } = languageConfig(language);
   const groupMap = new Map();
   for (const match of matches) {
     if (!match.group) continue;
@@ -586,11 +922,11 @@ function buildGroups(matches) {
   return Array.from(groupMap.values())
     .map((group) => ({
       ...group,
-      teams: Array.from(group.teams.values()).sort((a, b) => a.name.localeCompare(b.name, "es")),
-      standings: Array.from(group.teams.values()).sort(compareStandings),
+      teams: Array.from(group.teams.values()).sort((a, b) => a.name.localeCompare(b.name, locale)),
+      standings: Array.from(group.teams.values()).sort((a, b) => compareStandings(a, b, language)),
       matches: group.matches.slice().sort(compareMatchesByKickoff)
     }))
-    .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "es"));
+    .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, locale));
 }
 
 function initialView() {
@@ -604,7 +940,10 @@ function initialStatus() {
 }
 
 function App() {
-  const { matches, source, loading, error, updatedAt, refresh } = useFixture();
+  const [language] = useState(detectUserLanguage);
+  const i18n = languageConfig(language);
+  const languageContext = useMemo(() => ({ language, i18n }), [i18n, language]);
+  const { matches, source, loading, error, updatedAt, refresh } = useFixture(language);
   const [view, setView] = useState(initialView);
   const [status, setStatus] = useState(initialStatus);
   const [phase, setPhase] = useState("all");
@@ -631,7 +970,7 @@ function App() {
     () => Array.from(new Set(matches.map((match) => match.group).filter(Boolean))),
     [matches]
   );
-  const groupData = useMemo(() => buildGroups(matches), [matches]);
+  const groupData = useMemo(() => buildGroups(matches, language), [language, matches]);
 
   const filteredMatches = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -668,9 +1007,13 @@ function App() {
     [matches]
   );
 
-  const grouped = groupByDate(filteredMatches);
+  const grouped = groupByDate(filteredMatches, language);
   const playedCount = matches.filter((match) => match.statusTone === "played").length;
   const liveCount = liveMatches.length;
+
+  useEffect(() => {
+    document.documentElement.lang = i18n.htmlLang;
+  }, [i18n.htmlLang]);
 
   useEffect(() => {
     if (!loading && matches.length > 0 && status === "live" && liveCount === 0) {
@@ -693,17 +1036,20 @@ function App() {
 
   if (detailMatch) {
     return (
-      <MatchScreen
-        match={detailMatch}
-        onBack={() => setDetailMatchId(null)}
-        source={source}
-        refresh={refresh}
-        loading={loading}
-      />
+      <LanguageContext.Provider value={languageContext}>
+        <MatchScreen
+          match={detailMatch}
+          onBack={() => setDetailMatchId(null)}
+          source={source}
+          refresh={refresh}
+          loading={loading}
+        />
+      </LanguageContext.Provider>
     );
   }
 
   return (
+    <LanguageContext.Provider value={languageContext}>
     <main className="app-shell">
       <header className="topbar">
         <div className="brand">
@@ -711,8 +1057,8 @@ function App() {
             <Trophy size={22} />
           </div>
           <div>
-            <h1>Fixture Mundial 2026</h1>
-            <p>Partidos, grupos, estados y detalle en tiempo real</p>
+            <h1>{i18n.title}</h1>
+            <p>{i18n.tagline}</p>
           </div>
         </div>
         <div className="topbar-actions">
@@ -720,18 +1066,18 @@ function App() {
             {navigator.onLine ? <Wifi size={15} /> : <WifiOff size={15} />}
             {source}
           </span>
-          <button className="icon-button" onClick={refresh} disabled={loading} title="Actualizar">
+          <button className="icon-button" onClick={refresh} disabled={loading} title={i18n.refresh}>
             <RefreshCw size={18} className={loading ? "spin" : ""} />
-            <span>Actualizar</span>
+            <span>{i18n.refresh}</span>
           </button>
           <button
             className="icon-button secondary"
             onClick={installApp}
             disabled={!installPrompt}
-            title="Instalar PWA"
+            title={i18n.installPwa}
           >
             <Download size={18} />
-            <span>Instalar</span>
+            <span>{i18n.install}</span>
           </button>
         </div>
       </header>
@@ -748,15 +1094,15 @@ function App() {
         />
         <div className="metric">
           <strong>{matches.length}</strong>
-          <span>partidos</span>
+          <span>{i18n.matches}</span>
         </div>
         <div className="metric">
           <strong>{playedCount}</strong>
-          <span>jugados</span>
+          <span>{i18n.played}</span>
         </div>
         <div className="metric">
           <strong>{liveCount}</strong>
-          <span>en vivo</span>
+          <span>{i18n.live}</span>
         </div>
         <div className="metric timestamp">
           <strong>
@@ -766,10 +1112,10 @@ function App() {
                   hourCycle: "h23",
                   hour: "2-digit",
                   minute: "2-digit"
-                })
+                }, language)
               : "--"}
           </strong>
-          <span>ultima carga</span>
+          <span>{i18n.lastLoad}</span>
         </div>
       </section>
 
@@ -813,8 +1159,8 @@ function App() {
               ) : (
                 <div className="empty-state">
                   <Filter size={30} />
-                  <strong>No hay partidos para esos filtros</strong>
-                  <span>Probá cambiar fase, grupo o búsqueda.</span>
+                  <strong>{i18n.noMatchesTitle}</strong>
+                  <span>{i18n.noMatchesBody}</span>
                 </div>
               )}
             </div>
@@ -830,17 +1176,19 @@ function App() {
         />
       )}
     </main>
+    </LanguageContext.Provider>
   );
 }
 
 function PrimaryNav({ activeView, setView }) {
+  const { i18n } = useLanguage();
   const items = [
-    ["fixture", "Fixture", CalendarDays],
-    ["groups", "Grupos", Table2]
+    ["fixture", i18n.fixture, CalendarDays],
+    ["groups", i18n.groups, Table2]
   ];
 
   return (
-    <nav className="primary-nav" aria-label="Vistas principales">
+    <nav className="primary-nav" aria-label={i18n.mainViews}>
       {items.map(([value, label, Icon]) => (
         <button
           key={value}
@@ -856,6 +1204,7 @@ function PrimaryNav({ activeView, setView }) {
 }
 
 function GroupsScreen({ groups, activeGroupId, setActiveGroupId, loading, onOpenMatch }) {
+  const { i18n } = useLanguage();
   const activeGroup = groups.find((group) => String(group.id) === String(activeGroupId)) || groups[0];
 
   if (loading) {
@@ -871,8 +1220,8 @@ function GroupsScreen({ groups, activeGroupId, setActiveGroupId, loading, onOpen
       <section className="groups-screen">
         <div className="empty-state">
           <UsersRound size={30} />
-          <strong>No hay grupos publicados</strong>
-          <span>Cuando FIFA publique la fase de grupos, aparecerán acá.</span>
+          <strong>{i18n.noGroupsTitle}</strong>
+          <span>{i18n.noGroupsBody}</span>
         </div>
       </section>
     );
@@ -880,7 +1229,7 @@ function GroupsScreen({ groups, activeGroupId, setActiveGroupId, loading, onOpen
 
   return (
     <section className="groups-screen">
-      <div className="group-picker" aria-label="Grupos">
+      <div className="group-picker" aria-label={i18n.groups}>
         {groups.map((group) => (
           <button
             key={group.id}
@@ -888,7 +1237,7 @@ function GroupsScreen({ groups, activeGroupId, setActiveGroupId, loading, onOpen
             onClick={() => setActiveGroupId(String(group.id))}
           >
             <span>{group.name}</span>
-            <small>{group.teams.length} equipos</small>
+            <small>{group.teams.length} {i18n.teams.toLowerCase()}</small>
           </button>
         ))}
       </div>
@@ -900,7 +1249,7 @@ function GroupsScreen({ groups, activeGroupId, setActiveGroupId, loading, onOpen
               <span>{activeGroup.stage}</span>
               <h2>{activeGroup.name}</h2>
             </div>
-            <strong>Tabla de posiciones</strong>
+            <strong>{i18n.standings}</strong>
           </div>
           <StandingsTable standings={activeGroup.standings} />
         </section>
@@ -909,7 +1258,7 @@ function GroupsScreen({ groups, activeGroupId, setActiveGroupId, loading, onOpen
           <section className="group-card">
             <div className="group-panel-title">
               <UsersRound size={17} />
-              <h3>Equipos</h3>
+              <h3>{i18n.teams}</h3>
             </div>
             <div className="group-team-grid">
               {activeGroup.teams.map((team) => (
@@ -927,7 +1276,7 @@ function GroupsScreen({ groups, activeGroupId, setActiveGroupId, loading, onOpen
           <section className="group-card">
             <div className="group-panel-title">
               <CalendarDays size={17} />
-              <h3>Partidos</h3>
+              <h3>{i18n.matches}</h3>
             </div>
             <div className="group-match-list">
               {activeGroup.matches.map((match) => (
@@ -942,21 +1291,22 @@ function GroupsScreen({ groups, activeGroupId, setActiveGroupId, loading, onOpen
 }
 
 function StandingsTable({ standings }) {
+  const { i18n } = useLanguage();
   return (
     <div className="standings-wrap">
       <table className="standings-table">
         <thead>
           <tr>
             <th>#</th>
-            <th>Equipo</th>
-            <th>PJ</th>
-            <th>G</th>
-            <th>E</th>
-            <th>P</th>
-            <th>GF</th>
-            <th>GC</th>
-            <th>DG</th>
-            <th>Pts</th>
+            <th>{i18n.table.team}</th>
+            <th>{i18n.table.played}</th>
+            <th>{i18n.table.won}</th>
+            <th>{i18n.table.drawn}</th>
+            <th>{i18n.table.lost}</th>
+            <th>{i18n.table.goalsFor}</th>
+            <th>{i18n.table.goalsAgainst}</th>
+            <th>{i18n.table.goalDiff}</th>
+            <th>{i18n.table.points}</th>
           </tr>
         </thead>
         <tbody>
@@ -991,6 +1341,7 @@ function StandingsTable({ standings }) {
 }
 
 function GroupMatchItem({ match, onOpen }) {
+  const { language } = useLanguage();
   const goalSide = useScorePulse(match.id, match.homeScore, match.awayScore);
   const isLive = match.statusTone === "live";
   return (
@@ -999,7 +1350,7 @@ function GroupMatchItem({ match, onOpen }) {
       onClick={onOpen}
     >
       <div className="group-match-time">
-        <strong>{timeLabel(match)}</strong>
+        <strong>{timeLabel(match, language)}</strong>
         <span>#{match.matchNumber}</span>
       </div>
       <div className="group-match-teams">
@@ -1016,6 +1367,7 @@ function GroupMatchItem({ match, onOpen }) {
 }
 
 function MatchSpotlight({ liveMatches, nextMatch, onOpen }) {
+  const { language, i18n } = useLanguage();
   const [activeIndex, setActiveIndex] = useState(0);
   const hasLive = liveMatches.length > 0;
   const spotlightMatches = hasLive ? liveMatches : nextMatch ? [nextMatch] : [];
@@ -1026,14 +1378,14 @@ function MatchSpotlight({ liveMatches, nextMatch, onOpen }) {
   }, [hasLive, spotlightMatches.length]);
 
   const multipleLive = hasLive && spotlightMatches.length > 1;
-  const title = hasLive ? "Partido en vivo" : "Próximo partido";
+  const title = hasLive ? i18n.spotlightLive : i18n.spotlightNext;
   const goalSide = useScorePulse(activeMatch?.id, activeMatch?.homeScore, activeMatch?.awayScore);
 
   if (!activeMatch) return null;
 
   const meta = hasLive
-    ? [liveClockLabel(activeMatch), activeMatch.stage, activeMatch.group].filter(Boolean).join(" · ")
-    : `${formatDate(activeMatch.date, { weekday: "short", day: "2-digit", month: "short" })} · ${timeLabel(activeMatch)}`;
+    ? [liveClockLabel(activeMatch, language), activeMatch.stage, activeMatch.group].filter(Boolean).join(" · ")
+    : `${formatDate(activeMatch.date, { weekday: "short", day: "2-digit", month: "short" }, language)} · ${timeLabel(activeMatch, language)}`;
 
   function previous(event) {
     event.stopPropagation();
@@ -1096,15 +1448,15 @@ function MatchSpotlight({ liveMatches, nextMatch, onOpen }) {
       <div className="spotlight-footer">
         <span>
           <MapPin size={14} />
-          {activeMatch.city || activeMatch.stadium || "Sede por definir"}
+          {activeMatch.city || activeMatch.stadium || i18n.venueTbd}
         </span>
         {multipleLive && (
-          <div className="spotlight-controls" aria-label="Partidos en vivo">
+          <div className="spotlight-controls" aria-label={i18n.liveMatches}>
             <button
               type="button"
               onClick={previous}
               onKeyDown={stopCarouselKeyDown}
-              aria-label="Partido en vivo anterior"
+              aria-label={i18n.previousLive}
             >
               <ChevronLeft size={16} />
             </button>
@@ -1117,7 +1469,7 @@ function MatchSpotlight({ liveMatches, nextMatch, onOpen }) {
               type="button"
               onClick={next}
               onKeyDown={stopCarouselKeyDown}
-              aria-label="Siguiente partido en vivo"
+              aria-label={i18n.nextLive}
             >
               <ChevronRight size={16} />
             </button>
@@ -1129,16 +1481,17 @@ function MatchSpotlight({ liveMatches, nextMatch, onOpen }) {
 }
 
 function Filters(props) {
+  const { i18n } = useLanguage();
   const statusOptions = [
-    ["all", "Todos"],
-    ...(props.showLiveFilter ? [["live", "En vivo"]] : []),
-    ["played", "Jugados"],
-    ["upcoming", "Próximos"]
+    ["all", i18n.statusFilters.all],
+    ...(props.showLiveFilter ? [["live", i18n.statusFilters.live]] : []),
+    ["played", i18n.statusFilters.played],
+    ["upcoming", i18n.statusFilters.upcoming]
   ];
 
   return (
     <div className="filters">
-      <div className={`segmented options-${statusOptions.length}`} role="tablist" aria-label="Estado">
+      <div className={`segmented options-${statusOptions.length}`} role="tablist" aria-label={i18n.filters.status}>
         {statusOptions.map(([value, label]) => (
           <button
             key={value}
@@ -1150,9 +1503,9 @@ function Filters(props) {
         ))}
       </div>
       <label>
-        <span>Fase</span>
+        <span>{i18n.filters.stage}</span>
         <select value={props.phase} onChange={(event) => props.setPhase(event.target.value)}>
-          <option value="all">Todas</option>
+          <option value="all">{i18n.filters.allStages}</option>
           {props.phases.map((phase) => (
             <option key={phase} value={phase}>
               {phase}
@@ -1161,9 +1514,9 @@ function Filters(props) {
         </select>
       </label>
       <label>
-        <span>Grupo</span>
+        <span>{i18n.filters.group}</span>
         <select value={props.group} onChange={(event) => props.setGroup(event.target.value)}>
-          <option value="all">Todos</option>
+          <option value="all">{i18n.filters.allGroups}</option>
           {props.groups.map((group) => (
             <option key={group} value={group}>
               {group}
@@ -1176,7 +1529,7 @@ function Filters(props) {
         <input
           value={props.query}
           onChange={(event) => props.setQuery(event.target.value)}
-          placeholder="Buscar"
+          placeholder={i18n.filters.search}
         />
       </label>
     </div>
@@ -1184,6 +1537,7 @@ function Filters(props) {
 }
 
 function MatchRow({ match, selected, onSelect }) {
+  const { language } = useLanguage();
   const goalSide = useScorePulse(match.id, match.homeScore, match.awayScore);
   const isLive = match.statusTone === "live";
   return (
@@ -1192,7 +1546,7 @@ function MatchRow({ match, selected, onSelect }) {
       onClick={onSelect}
     >
       <div className="row-time">
-        <span>{timeLabel(match)}</span>
+        <span>{timeLabel(match, language)}</span>
         <small>#{match.matchNumber}</small>
       </div>
       <TeamCell name={match.homeName} code={match.homeCode} flag={match.homeFlag} highlight={goalSide === "home"} />
@@ -1222,24 +1576,25 @@ function TeamCell({ name, code, flag, align = "left", highlight = false }) {
 }
 
 function MatchScreen({ match, onBack, source, refresh, loading }) {
+  const { language, i18n } = useLanguage();
   const [tab, setTab] = useState("datos");
   const { liveMatch, events, loading: detailLoading, error, refresh: refreshDetail } = useMatchFeed(match);
-  const matchUrl = `${MATCH_CENTRE_BASE}/${match.competitionId}/${match.seasonId}/${match.stageId}/${match.id}`;
+  const matchUrl = `${matchCentreBase(language)}/${match.competitionId}/${match.seasonId}/${match.stageId}/${match.id}`;
   const liveRaw = liveMatch || match.raw;
   const homeScore = scoreFromRaw(match, liveRaw, "home");
   const awayScore = scoreFromRaw(match, liveRaw, "away");
   const currentTone = liveMatchTone(match, liveRaw);
-  const currentStatus = liveMatchLabel(match, liveRaw);
+  const currentStatus = liveMatchLabel(match, liveRaw, language);
   const goalSide = useScorePulse(match.id, homeScore, awayScore);
   const scoreMeta =
     currentTone === "live"
-      ? [detailClockLabel(match, liveRaw), match.stage, match.group].filter(Boolean).join(" · ")
-      : `${formatDate(match.date, { weekday: "short", day: "2-digit", month: "short" })} · ${timeLabel(match)}`;
+      ? [detailClockLabel(match, liveRaw, language), match.stage, match.group].filter(Boolean).join(" · ")
+      : `${formatDate(match.date, { weekday: "short", day: "2-digit", month: "short" }, language)} · ${timeLabel(match, language)}`;
   const tabs = [
-    ["datos", "Datos", ClipboardList],
-    ["stats", "Estadísticas", BarChart3],
-    ["formacion", "Formación", Shirt],
-    ["cronologia", "Cronología", ListChecks]
+    ["datos", i18n.detail.facts, ClipboardList],
+    ["stats", i18n.detail.stats, BarChart3],
+    ["formacion", i18n.detail.lineup, Shirt],
+    ["cronologia", i18n.detail.timeline, ListChecks]
   ];
   async function handleRefresh() {
     await Promise.allSettled([refresh(), refreshDetail()]);
@@ -1250,16 +1605,16 @@ function MatchScreen({ match, onBack, source, refresh, loading }) {
       <header className="match-topbar">
         <button className="back-button" onClick={onBack}>
           <ArrowLeft size={18} />
-          Fixture
+          {i18n.fixture}
         </button>
         <div className="match-topbar-status">
           <span className={`connection ${navigator.onLine ? "online" : "offline"}`}>
             {navigator.onLine ? <Wifi size={15} /> : <WifiOff size={15} />}
             {source}
           </span>
-          <button className="icon-button" onClick={handleRefresh} disabled={loading || detailLoading} title="Actualizar">
+          <button className="icon-button" onClick={handleRefresh} disabled={loading || detailLoading} title={i18n.refresh}>
             <RefreshCw size={18} className={loading || detailLoading ? "spin" : ""} />
-            <span>Actualizar</span>
+            <span>{i18n.refresh}</span>
           </button>
         </div>
       </header>
@@ -1269,7 +1624,7 @@ function MatchScreen({ match, onBack, source, refresh, loading }) {
       <section className={`match-hero ${currentTone === "live" ? "live" : ""} ${goalSide ? `goal-${goalSide}` : ""}`}>
         <div className="match-context">
           <span className={`status-pill ${currentTone}`}>{currentStatus}</span>
-          <span>Partido {match.matchNumber}</span>
+          <span>{i18n.matchNumber} {match.matchNumber}</span>
           <span>{match.stage}</span>
           {match.group && <span>{match.group}</span>}
         </div>
@@ -1284,7 +1639,7 @@ function MatchScreen({ match, onBack, source, refresh, loading }) {
         <div className="match-meta-row">
           <span>
             <MapPin size={15} />
-            {match.stadium || "Estadio por definir"} · {match.city || "Ciudad por definir"}
+            {match.stadium || i18n.stadiumTbd} · {match.city || i18n.cityTbd}
           </span>
           <a href={matchUrl} target="_blank" rel="noreferrer">
             FIFA match centre
@@ -1293,7 +1648,7 @@ function MatchScreen({ match, onBack, source, refresh, loading }) {
         </div>
       </section>
 
-      <nav className="detail-tabs" aria-label="Detalle del partido">
+      <nav className="detail-tabs" aria-label={i18n.detail.matchDetail}>
         {tabs.map(([value, label, Icon]) => (
           <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>
             <Icon size={17} />
@@ -1303,7 +1658,7 @@ function MatchScreen({ match, onBack, source, refresh, loading }) {
       </nav>
 
       <section className="detail-surface">
-        {detailLoading && <div className="inline-loading">Cargando datos del partido...</div>}
+        {detailLoading && <div className="inline-loading">{i18n.detail.loading}</div>}
         {tab === "datos" && <MatchFacts match={match} liveMatch={liveMatch} />}
         {tab === "stats" && <MatchStats match={match} liveMatch={liveMatch} events={events} />}
         {tab === "formacion" && <FormationView match={match} liveMatch={liveMatch} />}
@@ -1314,24 +1669,30 @@ function MatchScreen({ match, onBack, source, refresh, loading }) {
 }
 
 function MatchFacts({ match, liveMatch }) {
+  const { language, i18n } = useLanguage();
   const officials = liveMatch?.Officials || match.officials || [];
-  const referee = officials.find((official) => localized(official.TypeLocalized).toLowerCase().includes("árbitro")) || officials[0];
+  const referee =
+    officials.find((official) => {
+      const type = localized(official.TypeLocalized, language).toLowerCase();
+      return i18n.refereeNeedles.some((needle) => type.includes(needle));
+    }) || officials[0];
   const attendance = liveMatch?.Attendance ?? match.attendance;
-  const period = detailClockLabel(match, liveMatch || match.raw);
+  const period = detailClockLabel(match, liveMatch || match.raw, language);
 
   return (
     <div className="facts-grid">
-      <InfoItem icon={<Clock3 size={17} />} label="Fecha" value={`${formatDate(match.date, { weekday: "short", day: "2-digit", month: "short" })} · ${timeLabel(match)}`} />
-      <InfoItem icon={<MapPin size={17} />} label="Estadio" value={`${match.stadium || "Por definir"} · ${match.city || ""}`} />
-      <InfoItem icon={<Globe2 size={17} />} label="Fase" value={[match.stage, match.group].filter(Boolean).join(" · ")} />
-      <InfoItem icon={<Activity size={17} />} label="Estado" value={`${match.statusLabel} · ${period}`} />
-      <InfoItem icon={<ShieldCheck size={17} />} label="Árbitro" value={personName(referee) || "No publicado"} />
-      <InfoItem icon={<UsersRound size={17} />} label="Asistencia" value={attendance ? attendance.toLocaleString("es-AR") : "No publicada"} />
+      <InfoItem icon={<Clock3 size={17} />} label={i18n.facts.date} value={`${formatDate(match.date, { weekday: "short", day: "2-digit", month: "short" }, language)} · ${timeLabel(match, language)}`} />
+      <InfoItem icon={<MapPin size={17} />} label={i18n.facts.stadium} value={`${match.stadium || i18n.stadiumTbd} · ${match.city || ""}`} />
+      <InfoItem icon={<Globe2 size={17} />} label={i18n.facts.stage} value={[match.stage, match.group].filter(Boolean).join(" · ")} />
+      <InfoItem icon={<Activity size={17} />} label={i18n.facts.status} value={`${match.statusLabel} · ${period}`} />
+      <InfoItem icon={<ShieldCheck size={17} />} label={i18n.facts.referee} value={personName(referee, language) || i18n.noReferee} />
+      <InfoItem icon={<UsersRound size={17} />} label={i18n.facts.attendance} value={attendance ? attendance.toLocaleString(i18n.locale) : i18n.noAttendance} />
     </div>
   );
 }
 
-function eventTeamStats(events, match) {
+function eventTeamStats(events, match, language = "en") {
+  const { eventNeedles } = languageConfig(language);
   const teams = {
     home: { label: match.homeCode, id: match.raw.Home?.IdTeam, goals: 0, cards: 0, fouls: 0, subs: 0, events: 0 },
     away: { label: match.awayCode, id: match.raw.Away?.IdTeam, goals: 0, cards: 0, fouls: 0, subs: 0, events: 0 }
@@ -1339,54 +1700,55 @@ function eventTeamStats(events, match) {
   for (const event of events) {
     const side = event.IdTeam === teams.home.id ? "home" : event.IdTeam === teams.away.id ? "away" : null;
     if (!side) continue;
-    const label = localized(event.TypeLocalized).toLowerCase();
+    const label = localized(event.TypeLocalized, language).toLowerCase();
     teams[side].events += 1;
-    if (label.includes("gol")) teams[side].goals += 1;
-    if (label.includes("tarjeta")) teams[side].cards += 1;
-    if (label.includes("falta")) teams[side].fouls += 1;
-    if (label.includes("sustit") || label.includes("cambio")) teams[side].subs += 1;
+    if (eventNeedles.goal.some((needle) => label.includes(needle))) teams[side].goals += 1;
+    if (eventNeedles.card.some((needle) => label.includes(needle))) teams[side].cards += 1;
+    if (eventNeedles.foul.some((needle) => label.includes(needle))) teams[side].fouls += 1;
+    if (eventNeedles.substitution.some((needle) => label.includes(needle))) teams[side].subs += 1;
   }
   return teams;
 }
 
 function MatchStats({ match, liveMatch, events }) {
-  const stats = eventTeamStats(events, match);
+  const { language, i18n } = useLanguage();
+  const stats = eventTeamStats(events, match, language);
   const liveRaw = liveMatch || match.raw;
   const homeScore = scoreFromRaw(match, liveRaw, "home");
   const awayScore = scoreFromRaw(match, liveRaw, "away");
   const goalSide = useScorePulse(match.id, homeScore, awayScore);
   const rows = [
-    ["Goles detectados", stats.home.goals, stats.away.goals],
-    ["Tarjetas", stats.home.cards, stats.away.cards],
-    ["Faltas registradas", stats.home.fouls, stats.away.fouls],
-    ["Cambios", stats.home.subs, stats.away.subs],
-    ["Eventos FIFA", stats.home.events, stats.away.events]
+    [i18n.stats.goalsDetected, stats.home.goals, stats.away.goals],
+    [i18n.stats.cards, stats.home.cards, stats.away.cards],
+    [i18n.stats.fouls, stats.home.fouls, stats.away.fouls],
+    [i18n.stats.substitutions, stats.home.subs, stats.away.subs],
+    [i18n.stats.fifaEvents, stats.home.events, stats.away.events]
   ];
   const hasPossession = liveMatch?.BallPossession || liveMatch?.TerritorialPossesion;
 
   return (
     <div className="stats-layout">
       <div className="stat-card primary">
-        <span>Marcador</span>
+        <span>{i18n.stats.score}</span>
         <AnimatedScore homeScore={homeScore} awayScore={awayScore} goalSide={goalSide} separator="-" compact />
         <small>
           {match.homeCode} vs {match.awayCode}
         </small>
       </div>
       <div className="stat-card">
-        <span>Minuto / periodo</span>
-        <strong>{detailClockLabel(match, liveRaw)}</strong>
-        <small>{liveMatch?.Period ? `Periodo ${liveMatch.Period}` : "Dato FIFA"}</small>
+        <span>{i18n.stats.minutePeriod}</span>
+        <strong>{detailClockLabel(match, liveRaw, language)}</strong>
+        <small>{liveMatch?.Period ? `${i18n.stats.period} ${liveMatch.Period}` : i18n.fifaData}</small>
       </div>
       <div className="stat-card">
-        <span>Posesión</span>
-        <strong>{hasPossession ? "Disponible" : "--"}</strong>
-        <small>{hasPossession ? "Publicada por FIFA" : "No publicada para este partido"}</small>
+        <span>{i18n.stats.possession}</span>
+        <strong>{hasPossession ? i18n.stats.available : i18n.stats.unavailable}</strong>
+        <small>{hasPossession ? i18n.stats.published : i18n.stats.notPublished}</small>
       </div>
       <div className="stats-table">
         <div className="stats-table-head">
           <strong>{match.homeCode}</strong>
-          <span>Estadística</span>
+          <span>{i18n.stats.statistic}</span>
           <strong>{match.awayCode}</strong>
         </div>
         {rows.map(([label, home, away]) => (
@@ -1401,12 +1763,13 @@ function MatchStats({ match, liveMatch, events }) {
   );
 }
 
-function positionLabel(position) {
-  if (position === 0) return "Arquero";
-  if (position === 1) return "Defensa";
-  if (position === 2) return "Medio";
-  if (position === 3) return "Delantero";
-  return "Plantel";
+function positionLabel(position, language = "en") {
+  const { positions } = languageConfig(language);
+  if (position === 0) return positions.goalkeeper;
+  if (position === 1) return positions.defender;
+  if (position === 2) return positions.midfielder;
+  if (position === 3) return positions.forward;
+  return positions.squad;
 }
 
 function starterSortValue(player) {
@@ -1482,6 +1845,7 @@ function FormationView({ match, liveMatch }) {
 }
 
 function TeamFormation({ title, code, flag, team }) {
+  const { language, i18n } = useLanguage();
   const players = team?.Players || [];
   const starters = players.filter((player) => player.Status === 1).slice(0, 11);
   const bench = starters.length ? players.filter((player) => player.Status !== 1).slice(0, 9) : [];
@@ -1501,15 +1865,15 @@ function TeamFormation({ title, code, flag, team }) {
       {starters.length ? (
         <PitchFormation players={starters} tactic={team?.Tactics} teamCode={code} />
       ) : (
-        <div className="timeline-empty formation-empty">FIFA todavía no publicó la formación inicial de este equipo.</div>
+        <div className="timeline-empty formation-empty">{i18n.formation.empty}</div>
       )}
       {bench.length > 0 && (
         <details className="bench-list">
-          <summary>Suplentes</summary>
+          <summary>{i18n.formation.bench}</summary>
           {bench.map((player) => (
             <div className="bench-row" key={player.IdPlayer || `${code}-bench-${player.ShirtNumber}`}>
               <span>{player.ShirtNumber || "--"}</span>
-              {playerName(player)}
+              {playerName(player, language)}
             </div>
           ))}
         </details>
@@ -1519,10 +1883,11 @@ function TeamFormation({ title, code, flag, team }) {
 }
 
 function PitchFormation({ players, tactic, teamCode }) {
+  const { language, i18n } = useLanguage();
   const placements = pitchPlacements(players, tactic);
 
   return (
-    <div className="pitch-formation" aria-label={`Formación de ${teamCode}`}>
+    <div className="pitch-formation" aria-label={`${i18n.formation.aria} ${teamCode}`}>
       <span className="pitch-halfway" aria-hidden="true" />
       <span className="pitch-circle" aria-hidden="true" />
       <span className="pitch-box pitch-box-top" aria-hidden="true" />
@@ -1536,9 +1901,9 @@ function PitchFormation({ players, tactic, teamCode }) {
           style={{ left: `${x}%`, top: `${y}%` }}
         >
           <span className="pitch-number">{player.ShirtNumber || "--"}</span>
-          <strong>{playerName(player)}</strong>
+          <strong>{playerName(player, language)}</strong>
           <small>
-            {positionLabel(player.Position)}
+            {positionLabel(player.Position, language)}
             {player.Captain ? " - C" : ""}
           </small>
         </div>
@@ -1548,11 +1913,12 @@ function PitchFormation({ players, tactic, teamCode }) {
 }
 
 function TimelineView({ events }) {
+  const { language, i18n } = useLanguage();
   const sortedEvents = events.slice().reverse();
   if (!sortedEvents.length) {
     return (
       <div className="timeline-empty large">
-        La cronología aparece cuando FIFA publica eventos del partido.
+        {i18n.timeline.empty}
       </div>
     );
   }
@@ -1562,8 +1928,8 @@ function TimelineView({ events }) {
         <div className="timeline-event" key={event.EventId}>
           <strong>{event.MatchMinute || "--"}</strong>
           <div>
-            <span>{localized(event.TypeLocalized) || "Evento"}</span>
-            <p>{localized(event.EventDescription)}</p>
+            <span>{localized(event.TypeLocalized, language) || i18n.timeline.event}</span>
+            <p>{localized(event.EventDescription, language)}</p>
           </div>
         </div>
       ))}
@@ -1572,17 +1938,18 @@ function TimelineView({ events }) {
 }
 
 function MatchDetail({ match }) {
+  const { language, i18n } = useLanguage();
   const { events, loading, status } = useTimeline(match);
   if (!match) {
     return (
       <aside className="detail-pane empty">
         <ShieldCheck size={32} />
-        <strong>Seleccioná un partido</strong>
+        <strong>{i18n.selectMatch}</strong>
       </aside>
     );
   }
 
-  const matchUrl = `${MATCH_CENTRE_BASE}/${match.competitionId}/${match.seasonId}/${match.stageId}/${match.id}`;
+  const matchUrl = `${matchCentreBase(language)}/${match.competitionId}/${match.seasonId}/${match.stageId}/${match.id}`;
 
   return (
     <aside className="detail-pane">
@@ -1596,7 +1963,7 @@ function MatchDetail({ match }) {
       <div className="detail-score">
         <DetailTeam match={match} side="home" />
         <div className="detail-scoreline">
-          <span>Partido {match.matchNumber}</span>
+          <span>{i18n.matchNumber} {match.matchNumber}</span>
           <strong>
             {match.homeScore ?? "-"} : {match.awayScore ?? "-"}
           </strong>
@@ -1606,32 +1973,32 @@ function MatchDetail({ match }) {
       </div>
 
       <div className="detail-grid">
-        <InfoItem icon={<Clock3 size={17} />} label="Fecha" value={`${formatDate(match.date, { weekday: "short", day: "2-digit", month: "short" })} · ${timeLabel(match)}`} />
-        <InfoItem icon={<MapPin size={17} />} label="Estadio" value={`${match.stadium || "Por definir"} · ${match.city || ""}`} />
-        <InfoItem icon={<Globe2 size={17} />} label="Grupo" value={match.group || "Eliminatoria"} />
+        <InfoItem icon={<Clock3 size={17} />} label={i18n.facts.date} value={`${formatDate(match.date, { weekday: "short", day: "2-digit", month: "short" }, language)} · ${timeLabel(match, language)}`} />
+        <InfoItem icon={<MapPin size={17} />} label={i18n.facts.stadium} value={`${match.stadium || i18n.stadiumTbd} · ${match.city || ""}`} />
+        <InfoItem icon={<Globe2 size={17} />} label={i18n.filters.group} value={match.group || i18n.knockout} />
         <InfoItem icon={<ShieldCheck size={17} />} label="ID FIFA" value={match.id} />
       </div>
 
       <section className="timeline">
         <div className="panel-title">
-          <h3>Cronología</h3>
-          {loading && <span>Cargando</span>}
+          <h3>{i18n.detail.timeline}</h3>
+          {loading && <span>{i18n.sourceLoading}</span>}
         </div>
         {events.length ? (
           events.map((event) => (
             <div className="timeline-event" key={event.EventId}>
               <strong>{event.MatchMinute || "--"}</strong>
               <div>
-                <span>{localized(event.TypeLocalized) || "Evento"}</span>
-                <p>{localized(event.EventDescription)}</p>
+                <span>{localized(event.TypeLocalized, language) || i18n.timeline.event}</span>
+                <p>{localized(event.EventDescription, language)}</p>
               </div>
             </div>
           ))
         ) : (
           <div className="timeline-empty">
             {status === "error"
-              ? "No se pudo cargar la cronología."
-              : "La cronología aparece cuando FIFA publica eventos del partido."}
+              ? i18n.timeline.error
+              : i18n.timeline.empty}
           </div>
         )}
       </section>
