@@ -19,6 +19,7 @@ import {
   Search,
   Shirt,
   ShieldCheck,
+  Table2,
   Trophy,
   UsersRound,
   Wifi,
@@ -305,12 +306,110 @@ function groupByDate(matches) {
   }, {});
 }
 
+function teamRecord(match, side) {
+  const prefix = side === "home" ? "home" : "away";
+  return {
+    id: side === "home" ? match.raw.Home?.IdTeam : match.raw.Away?.IdTeam,
+    code: match[`${prefix}Code`],
+    name: match[`${prefix}Name`],
+    flag: match[`${prefix}Flag`]
+  };
+}
+
+function addTeam(table, team) {
+  const key = team.id || team.code || team.name;
+  if (!key || key === "TBD") return null;
+  if (!table.has(key)) {
+    table.set(key, {
+      ...team,
+      played: 0,
+      won: 0,
+      drawn: 0,
+      lost: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+      goalDiff: 0,
+      points: 0
+    });
+  }
+  return table.get(key);
+}
+
+function applyResult(team, goalsFor, goalsAgainst) {
+  team.played += 1;
+  team.goalsFor += goalsFor;
+  team.goalsAgainst += goalsAgainst;
+  team.goalDiff = team.goalsFor - team.goalsAgainst;
+  if (goalsFor > goalsAgainst) {
+    team.won += 1;
+    team.points += 3;
+  } else if (goalsFor === goalsAgainst) {
+    team.drawn += 1;
+    team.points += 1;
+  } else {
+    team.lost += 1;
+  }
+}
+
+function compareStandings(a, b) {
+  return (
+    b.points - a.points ||
+    b.goalDiff - a.goalDiff ||
+    b.goalsFor - a.goalsFor ||
+    a.name.localeCompare(b.name, "es")
+  );
+}
+
+function buildGroups(matches) {
+  const groupMap = new Map();
+  for (const match of matches) {
+    if (!match.group) continue;
+    const key = match.groupId || match.group;
+    if (!groupMap.has(key)) {
+      groupMap.set(key, {
+        id: key,
+        name: match.group,
+        stage: match.stage,
+        order: match.groupId || 999,
+        teams: new Map(),
+        matches: []
+      });
+    }
+
+    const group = groupMap.get(key);
+    const home = addTeam(group.teams, teamRecord(match, "home"));
+    const away = addTeam(group.teams, teamRecord(match, "away"));
+    group.matches.push(match);
+
+    const scoreReady =
+      (match.statusTone === "played" || match.statusTone === "live") &&
+      Number.isFinite(match.homeScore) &&
+      Number.isFinite(match.awayScore);
+
+    if (scoreReady && home && away) {
+      applyResult(home, match.homeScore, match.awayScore);
+      applyResult(away, match.awayScore, match.homeScore);
+    }
+  }
+
+  return Array.from(groupMap.values())
+    .map((group) => ({
+      ...group,
+      teams: Array.from(group.teams.values()).sort((a, b) => a.name.localeCompare(b.name, "es")),
+      standings: Array.from(group.teams.values()).sort(compareStandings),
+      matches: group.matches.slice().sort(compareMatchesByKickoff)
+    }))
+    .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "es"));
+}
+
 function App() {
   const { matches, source, loading, error, updatedAt, refresh } = useFixture();
+  const [view, setView] = useState("fixture");
   const [status, setStatus] = useState("all");
   const [phase, setPhase] = useState("all");
   const [group, setGroup] = useState("all");
   const [query, setQuery] = useState("");
+  const [activeGroupId, setActiveGroupId] = useState("");
   const [detailMatchId, setDetailMatchId] = useState(null);
   const [installPrompt, setInstallPrompt] = useState(null);
 
@@ -331,6 +430,7 @@ function App() {
     () => Array.from(new Set(matches.map((match) => match.group).filter(Boolean))),
     [matches]
   );
+  const groupData = useMemo(() => buildGroups(matches), [matches]);
 
   const filteredMatches = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -376,6 +476,13 @@ function App() {
       setStatus("all");
     }
   }, [liveCount, status]);
+
+  useEffect(() => {
+    if (!groupData.length) return;
+    if (!groupData.some((groupItem) => String(groupItem.id) === String(activeGroupId))) {
+      setActiveGroupId(String(groupData[0].id));
+    }
+  }, [activeGroupId, groupData]);
 
   async function installApp() {
     if (!installPrompt) return;
@@ -428,6 +535,8 @@ function App() {
         </div>
       </header>
 
+      <PrimaryNav activeView={view} setView={setView} />
+
       {error && <div className="notice">{error}</div>}
 
       <section className="score-strip">
@@ -463,53 +572,241 @@ function App() {
         </div>
       </section>
 
-      <section className="workspace clean">
-        <div className="fixture-pane">
-          <Filters
-            status={status}
-            setStatus={setStatus}
-            phase={phase}
-            setPhase={setPhase}
-            group={group}
-            setGroup={setGroup}
-            query={query}
-            setQuery={setQuery}
-            phases={phases}
-            groups={groups}
-            showLiveFilter={liveCount > 0}
-          />
-          <div className="match-list" aria-live="polite">
-            {loading && !matches.length ? (
-              <SkeletonList />
-            ) : filteredMatches.length ? (
-              Object.entries(grouped).map(([day, dayMatches]) => (
-                <section className="day-group" key={day}>
-                  <div className="day-heading">
-                    <CalendarDays size={16} />
-                    <h2>{day}</h2>
-                    <span>{dayMatches.length}</span>
-                  </div>
-                  {dayMatches.map((match) => (
-                    <MatchRow
-                      key={match.id}
-                      match={match}
-                      selected={false}
-                      onSelect={() => setDetailMatchId(match.id)}
-                    />
-                  ))}
-                </section>
-              ))
-            ) : (
-              <div className="empty-state">
-                <Filter size={30} />
-                <strong>No hay partidos para esos filtros</strong>
-                <span>Probá cambiar fase, grupo o búsqueda.</span>
-              </div>
-            )}
+      {view === "fixture" ? (
+        <section className="workspace clean">
+          <div className="fixture-pane">
+            <Filters
+              status={status}
+              setStatus={setStatus}
+              phase={phase}
+              setPhase={setPhase}
+              group={group}
+              setGroup={setGroup}
+              query={query}
+              setQuery={setQuery}
+              phases={phases}
+              groups={groups}
+              showLiveFilter={liveCount > 0}
+            />
+            <div className="match-list" aria-live="polite">
+              {loading && !matches.length ? (
+                <SkeletonList />
+              ) : filteredMatches.length ? (
+                Object.entries(grouped).map(([day, dayMatches]) => (
+                  <section className="day-group" key={day}>
+                    <div className="day-heading">
+                      <CalendarDays size={16} />
+                      <h2>{day}</h2>
+                      <span>{dayMatches.length}</span>
+                    </div>
+                    {dayMatches.map((match) => (
+                      <MatchRow
+                        key={match.id}
+                        match={match}
+                        selected={false}
+                        onSelect={() => setDetailMatchId(match.id)}
+                      />
+                    ))}
+                  </section>
+                ))
+              ) : (
+                <div className="empty-state">
+                  <Filter size={30} />
+                  <strong>No hay partidos para esos filtros</strong>
+                  <span>Probá cambiar fase, grupo o búsqueda.</span>
+                </div>
+              )}
+            </div>
           </div>
+        </section>
+      ) : (
+        <GroupsScreen
+          groups={groupData}
+          activeGroupId={activeGroupId}
+          setActiveGroupId={setActiveGroupId}
+          loading={loading && !matches.length}
+          onOpenMatch={(match) => setDetailMatchId(match.id)}
+        />
+      )}
+    </main>
+  );
+}
+
+function PrimaryNav({ activeView, setView }) {
+  const items = [
+    ["fixture", "Fixture", CalendarDays],
+    ["groups", "Grupos", Table2]
+  ];
+
+  return (
+    <nav className="primary-nav" aria-label="Vistas principales">
+      {items.map(([value, label, Icon]) => (
+        <button
+          key={value}
+          className={activeView === value ? "active" : ""}
+          onClick={() => setView(value)}
+        >
+          <Icon size={17} />
+          {label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function GroupsScreen({ groups, activeGroupId, setActiveGroupId, loading, onOpenMatch }) {
+  const activeGroup = groups.find((group) => String(group.id) === String(activeGroupId)) || groups[0];
+
+  if (loading) {
+    return (
+      <section className="groups-screen">
+        <SkeletonList />
+      </section>
+    );
+  }
+
+  if (!activeGroup) {
+    return (
+      <section className="groups-screen">
+        <div className="empty-state">
+          <UsersRound size={30} />
+          <strong>No hay grupos publicados</strong>
+          <span>Cuando FIFA publique la fase de grupos, aparecerán acá.</span>
         </div>
       </section>
-    </main>
+    );
+  }
+
+  return (
+    <section className="groups-screen">
+      <div className="group-picker" aria-label="Grupos">
+        {groups.map((group) => (
+          <button
+            key={group.id}
+            className={String(group.id) === String(activeGroup.id) ? "active" : ""}
+            onClick={() => setActiveGroupId(String(group.id))}
+          >
+            <span>{group.name}</span>
+            <small>{group.teams.length} equipos</small>
+          </button>
+        ))}
+      </div>
+
+      <div className="groups-layout">
+        <section className="group-card standings-card">
+          <div className="group-card-head">
+            <div>
+              <span>{activeGroup.stage}</span>
+              <h2>{activeGroup.name}</h2>
+            </div>
+            <strong>Tabla de posiciones</strong>
+          </div>
+          <StandingsTable standings={activeGroup.standings} />
+        </section>
+
+        <aside className="group-side">
+          <section className="group-card">
+            <div className="group-panel-title">
+              <UsersRound size={17} />
+              <h3>Equipos</h3>
+            </div>
+            <div className="group-team-grid">
+              {activeGroup.teams.map((team) => (
+                <div className="group-team-card" key={team.id || team.code}>
+                  {team.flag ? <img src={flagUrl(team.flag)} alt="" /> : <span>{team.code[0]}</span>}
+                  <div>
+                    <strong>{team.code}</strong>
+                    <small>{team.name}</small>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="group-card">
+            <div className="group-panel-title">
+              <CalendarDays size={17} />
+              <h3>Partidos</h3>
+            </div>
+            <div className="group-match-list">
+              {activeGroup.matches.map((match) => (
+                <GroupMatchItem key={match.id} match={match} onOpen={() => onOpenMatch(match)} />
+              ))}
+            </div>
+          </section>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function StandingsTable({ standings }) {
+  return (
+    <div className="standings-wrap">
+      <table className="standings-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Equipo</th>
+            <th>PJ</th>
+            <th>G</th>
+            <th>E</th>
+            <th>P</th>
+            <th>GF</th>
+            <th>GC</th>
+            <th>DG</th>
+            <th>Pts</th>
+          </tr>
+        </thead>
+        <tbody>
+          {standings.map((team, index) => (
+            <tr key={team.id || team.code} className={index < 2 ? "qualify" : ""}>
+              <td>{index + 1}</td>
+              <td>
+                <div className="standing-team">
+                  {team.flag ? <img src={flagUrl(team.flag)} alt="" /> : <span>{team.code[0]}</span>}
+                  <div>
+                    <strong>{team.code}</strong>
+                    <small>{team.name}</small>
+                  </div>
+                </div>
+              </td>
+              <td>{team.played}</td>
+              <td>{team.won}</td>
+              <td>{team.drawn}</td>
+              <td>{team.lost}</td>
+              <td>{team.goalsFor}</td>
+              <td>{team.goalsAgainst}</td>
+              <td>{team.goalDiff > 0 ? `+${team.goalDiff}` : team.goalDiff}</td>
+              <td>
+                <strong>{team.points}</strong>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function GroupMatchItem({ match, onOpen }) {
+  const hasScore = match.homeScore !== null || match.awayScore !== null;
+  return (
+    <button className="group-match-item" onClick={onOpen}>
+      <div className="group-match-time">
+        <strong>{timeLabel(match)}</strong>
+        <span>#{match.matchNumber}</span>
+      </div>
+      <div className="group-match-teams">
+        <span>{match.homeCode}</span>
+        <strong>{hasScore ? `${match.homeScore ?? "-"} - ${match.awayScore ?? "-"}` : "vs"}</strong>
+        <span>{match.awayCode}</span>
+      </div>
+      <div className="group-match-meta">
+        <span className={`status-pill ${match.statusTone}`}>{match.statusLabel}</span>
+        <small>{match.city || match.stadium}</small>
+      </div>
+    </button>
   );
 }
 
