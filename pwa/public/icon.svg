@@ -1,7 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#07182f"/>
-  <circle cx="256" cy="256" r="150" fill="#14c8dd"/>
-  <circle cx="256" cy="256" r="118" fill="#f5f8fb"/>
-  <path d="M256 118l40 74 84 16-58 62 11 85-77-36-77 36 11-85-58-62 84-16 40-74z" fill="#18a874"/>
-  <path d="M122 356c31 42 80 69 134 69s103-27 134-69" fill="none" stroke="#07182f" stroke-width="24" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Fixtu26</title>
+  <defs>
+    <linearGradient id="bg" x1="64" y1="36" x2="448" y2="476" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#092747"/>
+      <stop offset=".58" stop-color="#07182f"/>
+      <stop offset="1" stop-color="#061123"/>
+    </linearGradient>
+    <linearGradient id="pitch" x1="111" y1="126" x2="401" y2="399" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1dd7c7"/>
+      <stop offset="1" stop-color="#17a66f"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <path d="M128 90h256c21 0 38 17 38 38v210c0 63-50 105-166 145C140 443 90 401 90 338V128c0-21 17-38 38-38z" fill="#ffffff" opacity=".08"/>
+  <rect x="116" y="116" width="280" height="280" rx="44" fill="url(#pitch)" opacity=".98"/>
+  <path d="M140 176h232M140 256h232M140 336h232" stroke="#ffffff" stroke-width="10" stroke-opacity=".18"/>
+  <rect x="150" y="150" width="212" height="212" rx="16" fill="none" stroke="#ffffff" stroke-width="14" stroke-opacity=".72"/>
+  <path d="M201 150v65h110v-65M201 362v-65h110v65" fill="none" stroke="#ffffff" stroke-width="12" stroke-opacity=".64"/>
+  <circle cx="256" cy="256" r="58" fill="none" stroke="#ffffff" stroke-width="12" stroke-opacity=".72"/>
+  <circle cx="256" cy="256" r="8" fill="#ffffff" opacity=".9"/>
+  <path d="M209 167h94v30c0 23-17 41-47 41s-47-18-47-41v-30z" fill="#07182f"/>
+  <path d="M222 181h68v18c0 16-13 27-34 27s-34-11-34-27v-18z" fill="#ffffff" opacity=".95"/>
+  <path d="M190 176h32v22c-20 0-32-8-32-22zm100 0h32c0 14-12 22-32 22v-22zM239 236h34v36h-34zM215 272h82v27h-82z" fill="#07182f"/>
+  <rect x="136" y="349" width="240" height="70" rx="28" fill="#07182f"/>
+  <text x="256" y="399" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="58" font-weight="900" letter-spacing="0" fill="#ffffff">F26</text>
 </svg>

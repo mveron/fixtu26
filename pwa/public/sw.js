@@ -1,9 +1,20 @@
-const CACHE_NAME = "fixture-2026-v1";
+const CACHE_NAME = "fixtu26-v2";
 const APP_SHELL = [
   "/",
   "/index.html",
   "/manifest.webmanifest",
   "/icon.svg",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/maskable-192.png",
+  "/icons/maskable-512.png",
+  "/icons/apple-touch-icon.png",
+  "/icons/shortcut-fixture.png",
+  "/icons/shortcut-live.png",
+  "/icons/shortcut-groups.png",
+  "/screenshots/fixture-mobile.png",
+  "/screenshots/groups-mobile.png",
+  "/screenshots/fixture-wide.png",
   "/fixture-seed.json"
 ];
 

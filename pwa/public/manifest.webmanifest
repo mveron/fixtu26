@@ -1,18 +1,113 @@
 {
-  "name": "Fixture Mundial 2026",
-  "short_name": "Fixture 2026",
-  "description": "PWA para seguir partidos, grupos, fases y resultados de la FIFA World Cup 2026.",
-  "start_url": "/",
+  "id": "/",
+  "name": "Fixtu26 - Fixture Mundial 2026",
+  "short_name": "Fixtu26",
+  "description": "PWA para seguir partidos, grupos, tablas, estados en vivo y detalles de la FIFA World Cup 2026.",
+  "lang": "es-AR",
+  "dir": "ltr",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#f5f8fb",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#f4f7fb",
   "theme_color": "#07182f",
-  "orientation": "portrait-primary",
+  "orientation": "any",
+  "categories": ["sports", "news", "productivity"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/fixture-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Fixture con partidos en vivo y próximos encuentros"
+    },
+    {
+      "src": "/screenshots/groups-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Grupos y tabla de posiciones"
+    },
+    {
+      "src": "/screenshots/fixture-wide.png",
+      "sizes": "1280x900",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Fixture Mundial 2026 en escritorio"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Fixture",
+      "short_name": "Fixture",
+      "description": "Abrir el fixture de partidos",
+      "url": "/?view=fixture&source=shortcut",
+      "icons": [
+        {
+          "src": "/icons/shortcut-fixture.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Partidos en vivo",
+      "short_name": "En vivo",
+      "description": "Ver partidos en vivo",
+      "url": "/?view=fixture&status=live&source=shortcut",
+      "icons": [
+        {
+          "src": "/icons/shortcut-live.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Grupos",
+      "short_name": "Grupos",
+      "description": "Abrir grupos y tabla de posiciones",
+      "url": "/?view=groups&source=shortcut",
+      "icons": [
+        {
+          "src": "/icons/shortcut-groups.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
     }
   ]
 }

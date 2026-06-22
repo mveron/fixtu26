@@ -490,10 +490,20 @@ function buildGroups(matches) {
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "es"));
 }
 
+function initialView() {
+  const viewParam = new URLSearchParams(window.location.search).get("view");
+  return viewParam === "groups" ? "groups" : "fixture";
+}
+
+function initialStatus() {
+  const statusParam = new URLSearchParams(window.location.search).get("status");
+  return ["all", "live", "played", "upcoming"].includes(statusParam) ? statusParam : "all";
+}
+
 function App() {
   const { matches, source, loading, error, updatedAt, refresh } = useFixture();
-  const [view, setView] = useState("fixture");
-  const [status, setStatus] = useState("all");
+  const [view, setView] = useState(initialView);
+  const [status, setStatus] = useState(initialStatus);
   const [phase, setPhase] = useState("all");
   const [group, setGroup] = useState("all");
   const [query, setQuery] = useState("");
@@ -560,10 +570,10 @@ function App() {
   const liveCount = liveMatches.length;
 
   useEffect(() => {
-    if (status === "live" && liveCount === 0) {
+    if (!loading && matches.length > 0 && status === "live" && liveCount === 0) {
       setStatus("all");
     }
-  }, [liveCount, status]);
+  }, [liveCount, loading, matches.length, status]);
 
   useEffect(() => {
     if (!groupData.length) return;
