@@ -245,6 +245,67 @@ function detailClockLabel(match, raw) {
   return "Programado";
 }
 
+function normalizedScore(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function useScorePulse(matchKey, homeScore, awayScore) {
+  const previousRef = useRef({ matchKey, homeScore, awayScore });
+  const [goalSide, setGoalSide] = useState(null);
+
+  useEffect(() => {
+    const previous = previousRef.current;
+    const previousHome = normalizedScore(previous.homeScore);
+    const previousAway = normalizedScore(previous.awayScore);
+    const nextHome = normalizedScore(homeScore);
+    const nextAway = normalizedScore(awayScore);
+
+    previousRef.current = { matchKey, homeScore, awayScore };
+
+    if (previous.matchKey !== matchKey) {
+      setGoalSide(null);
+      return undefined;
+    }
+
+    const homeGoal = previousHome !== null && nextHome !== null && nextHome > previousHome;
+    const awayGoal = previousAway !== null && nextAway !== null && nextAway > previousAway;
+    const nextSide = homeGoal ? "home" : awayGoal ? "away" : null;
+
+    if (!nextSide) return undefined;
+
+    setGoalSide(nextSide);
+    const timeout = window.setTimeout(() => setGoalSide(null), 1800);
+    return () => window.clearTimeout(timeout);
+  }, [matchKey, homeScore, awayScore]);
+
+  return goalSide;
+}
+
+function AnimatedScore({ homeScore, awayScore, goalSide, separator = ":", compact = false }) {
+  const hasScore = homeScore !== null || awayScore !== null;
+
+  if (!hasScore) {
+    return <strong className="animated-score score-vs">vs</strong>;
+  }
+
+  return (
+    <strong
+      className={`animated-score ${compact ? "compact" : ""} ${goalSide ? `goal-${goalSide}` : ""}`}
+      aria-live="polite"
+    >
+      <span className={`score-number home ${goalSide === "home" ? "score-goal" : ""}`}>
+        {homeScore ?? "-"}
+      </span>
+      <span className="score-separator">{separator}</span>
+      <span className={`score-number away ${goalSide === "away" ? "score-goal" : ""}`}>
+        {awayScore ?? "-"}
+      </span>
+      {goalSide && <span className="goal-flash">Gol</span>}
+    </strong>
+  );
+}
+
 function useFixture() {
   const [matches, setMatches] = useState([]);
   const [source, setSource] = useState("Cargando");
@@ -930,16 +991,20 @@ function StandingsTable({ standings }) {
 }
 
 function GroupMatchItem({ match, onOpen }) {
-  const hasScore = match.homeScore !== null || match.awayScore !== null;
+  const goalSide = useScorePulse(match.id, match.homeScore, match.awayScore);
+  const isLive = match.statusTone === "live";
   return (
-    <button className="group-match-item" onClick={onOpen}>
+    <button
+      className={`group-match-item ${isLive ? "live" : ""} ${goalSide ? `goal-${goalSide}` : ""}`}
+      onClick={onOpen}
+    >
       <div className="group-match-time">
         <strong>{timeLabel(match)}</strong>
         <span>#{match.matchNumber}</span>
       </div>
       <div className="group-match-teams">
         <span>{match.homeCode}</span>
-        <strong>{hasScore ? `${match.homeScore ?? "-"} - ${match.awayScore ?? "-"}` : "vs"}</strong>
+        <AnimatedScore homeScore={match.homeScore} awayScore={match.awayScore} goalSide={goalSide} separator="-" compact />
         <span>{match.awayCode}</span>
       </div>
       <div className="group-match-meta">
@@ -960,11 +1025,12 @@ function MatchSpotlight({ liveMatches, nextMatch, onOpen }) {
     setActiveIndex(0);
   }, [hasLive, spotlightMatches.length]);
 
-  if (!activeMatch) return null;
-
-  const hasScore = activeMatch.homeScore !== null || activeMatch.awayScore !== null;
   const multipleLive = hasLive && spotlightMatches.length > 1;
   const title = hasLive ? "Partido en vivo" : "Próximo partido";
+  const goalSide = useScorePulse(activeMatch?.id, activeMatch?.homeScore, activeMatch?.awayScore);
+
+  if (!activeMatch) return null;
+
   const meta = hasLive
     ? [liveClockLabel(activeMatch), activeMatch.stage, activeMatch.group].filter(Boolean).join(" · ")
     : `${formatDate(activeMatch.date, { weekday: "short", day: "2-digit", month: "short" })} · ${timeLabel(activeMatch)}`;
@@ -996,7 +1062,7 @@ function MatchSpotlight({ liveMatches, nextMatch, onOpen }) {
 
   return (
     <section
-      className={`match-spotlight ${hasLive ? "live" : "upcoming"}`}
+      className={`match-spotlight ${hasLive ? "live" : "upcoming"} ${goalSide ? `goal-${goalSide}` : ""}`}
       role="button"
       tabIndex={0}
       onClick={openActiveMatch}
@@ -1009,21 +1075,19 @@ function MatchSpotlight({ liveMatches, nextMatch, onOpen }) {
       </div>
 
       <div className="spotlight-scoreboard">
-        <div className="spotlight-team">
+        <div className={`spotlight-team ${goalSide === "home" ? "goal-side" : ""}`}>
           {activeMatch.homeFlag && <img src={flagUrl(activeMatch.homeFlag)} alt="" />}
           <strong>{activeMatch.homeCode}</strong>
         </div>
         <div className="spotlight-score">
-          {hasScore ? (
-            <strong>
-              {activeMatch.homeScore ?? "-"} : {activeMatch.awayScore ?? "-"}
-            </strong>
-          ) : (
-            <strong>vs</strong>
-          )}
+          <AnimatedScore
+            homeScore={activeMatch.homeScore}
+            awayScore={activeMatch.awayScore}
+            goalSide={goalSide}
+          />
           <span>{meta}</span>
         </div>
-        <div className="spotlight-team away">
+        <div className={`spotlight-team away ${goalSide === "away" ? "goal-side" : ""}`}>
           {activeMatch.awayFlag && <img src={flagUrl(activeMatch.awayFlag)} alt="" />}
           <strong>{activeMatch.awayCode}</strong>
         </div>
@@ -1120,25 +1184,23 @@ function Filters(props) {
 }
 
 function MatchRow({ match, selected, onSelect }) {
-  const hasScore = match.homeScore !== null || match.awayScore !== null;
+  const goalSide = useScorePulse(match.id, match.homeScore, match.awayScore);
+  const isLive = match.statusTone === "live";
   return (
-    <button className={`match-row ${selected ? "selected" : ""}`} onClick={onSelect}>
+    <button
+      className={`match-row ${selected ? "selected" : ""} ${isLive ? "live" : ""} ${goalSide ? `goal-${goalSide}` : ""}`}
+      onClick={onSelect}
+    >
       <div className="row-time">
         <span>{timeLabel(match)}</span>
         <small>#{match.matchNumber}</small>
       </div>
-      <TeamCell name={match.homeName} code={match.homeCode} flag={match.homeFlag} />
+      <TeamCell name={match.homeName} code={match.homeCode} flag={match.homeFlag} highlight={goalSide === "home"} />
       <div className="score-cell">
-        {hasScore ? (
-          <strong>
-            {match.homeScore ?? "-"} - {match.awayScore ?? "-"}
-          </strong>
-        ) : (
-          <strong>vs</strong>
-        )}
+        <AnimatedScore homeScore={match.homeScore} awayScore={match.awayScore} goalSide={goalSide} separator="-" compact />
         <span className={`status-pill ${match.statusTone}`}>{match.statusLabel}</span>
       </div>
-      <TeamCell name={match.awayName} code={match.awayCode} flag={match.awayFlag} align="right" />
+      <TeamCell name={match.awayName} code={match.awayCode} flag={match.awayFlag} align="right" highlight={goalSide === "away"} />
       <div className="row-venue">
         <MapPin size={14} />
         <span>{match.city || match.stadium}</span>
@@ -1147,9 +1209,9 @@ function MatchRow({ match, selected, onSelect }) {
   );
 }
 
-function TeamCell({ name, code, flag, align = "left" }) {
+function TeamCell({ name, code, flag, align = "left", highlight = false }) {
   return (
-    <div className={`team-cell ${align}`}>
+    <div className={`team-cell ${align} ${highlight ? "goal-side" : ""}`}>
       {flag ? <img src={flagUrl(flag)} alt="" /> : <span className="flag-placeholder">{code[0]}</span>}
       <div>
         <strong>{code}</strong>
@@ -1168,6 +1230,7 @@ function MatchScreen({ match, onBack, source, refresh, loading }) {
   const awayScore = scoreFromRaw(match, liveRaw, "away");
   const currentTone = liveMatchTone(match, liveRaw);
   const currentStatus = liveMatchLabel(match, liveRaw);
+  const goalSide = useScorePulse(match.id, homeScore, awayScore);
   const scoreMeta =
     currentTone === "live"
       ? [detailClockLabel(match, liveRaw), match.stage, match.group].filter(Boolean).join(" · ")
@@ -1203,7 +1266,7 @@ function MatchScreen({ match, onBack, source, refresh, loading }) {
 
       {error && <div className="notice">{error}</div>}
 
-      <section className="match-hero">
+      <section className={`match-hero ${currentTone === "live" ? "live" : ""} ${goalSide ? `goal-${goalSide}` : ""}`}>
         <div className="match-context">
           <span className={`status-pill ${currentTone}`}>{currentStatus}</span>
           <span>Partido {match.matchNumber}</span>
@@ -1211,14 +1274,12 @@ function MatchScreen({ match, onBack, source, refresh, loading }) {
           {match.group && <span>{match.group}</span>}
         </div>
         <div className="match-hero-score">
-          <DetailTeam match={match} side="home" />
+          <DetailTeam match={match} side="home" highlight={goalSide === "home"} />
           <div className="hero-scoreline">
-            <strong>
-              {homeScore ?? "-"} : {awayScore ?? "-"}
-            </strong>
+            <AnimatedScore homeScore={homeScore} awayScore={awayScore} goalSide={goalSide} />
             <span>{scoreMeta}</span>
           </div>
-          <DetailTeam match={match} side="away" />
+          <DetailTeam match={match} side="away" highlight={goalSide === "away"} />
         </div>
         <div className="match-meta-row">
           <span>
@@ -1293,6 +1354,7 @@ function MatchStats({ match, liveMatch, events }) {
   const liveRaw = liveMatch || match.raw;
   const homeScore = scoreFromRaw(match, liveRaw, "home");
   const awayScore = scoreFromRaw(match, liveRaw, "away");
+  const goalSide = useScorePulse(match.id, homeScore, awayScore);
   const rows = [
     ["Goles detectados", stats.home.goals, stats.away.goals],
     ["Tarjetas", stats.home.cards, stats.away.cards],
@@ -1306,9 +1368,7 @@ function MatchStats({ match, liveMatch, events }) {
     <div className="stats-layout">
       <div className="stat-card primary">
         <span>Marcador</span>
-        <strong>
-          {homeScore ?? "-"} - {awayScore ?? "-"}
-        </strong>
+        <AnimatedScore homeScore={homeScore} awayScore={awayScore} goalSide={goalSide} separator="-" compact />
         <small>
           {match.homeCode} vs {match.awayCode}
         </small>
@@ -1579,13 +1639,13 @@ function MatchDetail({ match }) {
   );
 }
 
-function DetailTeam({ match, side }) {
+function DetailTeam({ match, side, highlight = false }) {
   const isHome = side === "home";
   const name = isHome ? match.homeName : match.awayName;
   const code = isHome ? match.homeCode : match.awayCode;
   const flag = isHome ? match.homeFlag : match.awayFlag;
   return (
-    <div className="detail-team">
+    <div className={`detail-team ${highlight ? "goal-side" : ""}`}>
       {flag ? <img src={flagUrl(flag)} alt="" /> : <span className="detail-flag">{code[0]}</span>}
       <strong>{code}</strong>
       <span>{name}</span>
