@@ -1,4 +1,4 @@
-const CACHE_NAME = "fixtu26-v2";
+const CACHE_NAME = "fixtu26-v3";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -59,6 +59,24 @@ self.addEventListener("fetch", (event) => {
         })
         .catch(() => cached);
       return cached || fetchPromise;
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = new URL(event.notification.data?.url || "/", self.location.origin).href;
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (new URL(client.url).origin !== self.location.origin) continue;
+        if ("navigate" in client) {
+          return client.navigate(targetUrl).then((navigatedClient) => (navigatedClient || client).focus());
+        }
+        return client.focus();
+      }
+      return clients.openWindow(targetUrl);
     })
   );
 });

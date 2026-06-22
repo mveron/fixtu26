@@ -4,6 +4,8 @@ import {
   Activity,
   ArrowLeft,
   BarChart3,
+  Bell,
+  BellRing,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -26,6 +28,13 @@ import {
   WifiOff
 } from "lucide-react";
 import "./styles.css";
+import {
+  NOTIFICATION_STORAGE_KEY,
+  createLiveNotification,
+  createNotificationState,
+  getNotificationSupport,
+  shouldNotifyLiveMatch
+} from "./notifications.js";
 
 const FIFA_API_BASE = "https://api.fifa.com/api/v3";
 const FIFA_TIMELINE_URL = "https://api.fifa.com/api/v3/timelines";
@@ -54,6 +63,14 @@ const I18N = {
     refresh: "Refresh",
     install: "Install",
     installPwa: "Install PWA",
+    notifications: {
+      enable: "Alerts",
+      enabled: "Alerts on",
+      blocked: "Blocked",
+      unsupported: "No alerts",
+      title: "Live match alerts",
+      permissionDenied: "Notifications are blocked in this browser."
+    },
     fixture: "Fixture",
     groups: "Groups",
     mainViews: "Main views",
@@ -197,6 +214,14 @@ const I18N = {
     refresh: "Actualizar",
     install: "Instalar",
     installPwa: "Instalar PWA",
+    notifications: {
+      enable: "Alertas",
+      enabled: "Alertas activas",
+      blocked: "Bloqueadas",
+      unsupported: "Sin alertas",
+      title: "Alertas de partidos en vivo",
+      permissionDenied: "Las notificaciones estan bloqueadas en este navegador."
+    },
     fixture: "Fixture",
     groups: "Grupos",
     mainViews: "Vistas principales",
@@ -939,6 +964,88 @@ function initialStatus() {
   return ["all", "live", "played", "upcoming"].includes(statusParam) ? statusParam : "all";
 }
 
+function initialDetailMatchId() {
+  return new URLSearchParams(window.location.search).get("match");
+}
+
+function storedNotificationsEnabled() {
+  try {
+    return localStorage.getItem(NOTIFICATION_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function setStoredNotificationsEnabled(enabled) {
+  try {
+    localStorage.setItem(NOTIFICATION_STORAGE_KEY, enabled ? "true" : "false");
+  } catch {
+    // Preference persistence is best-effort; notification permission remains the source of truth.
+  }
+}
+
+async function showPwaNotification(payload) {
+  const options = {
+    body: payload.body,
+    icon: payload.icon,
+    badge: payload.badge,
+    tag: payload.tag,
+    renotify: true,
+    data: { url: payload.url }
+  };
+
+  if (navigator.serviceWorker?.ready) {
+    const registration = await navigator.serviceWorker.ready;
+    await registration.showNotification(payload.title, options);
+    return;
+  }
+
+  new Notification(payload.title, options);
+}
+
+function useLiveNotifications(liveMatches, language) {
+  const [support, setSupport] = useState(() => getNotificationSupport(window));
+  const [enabled, setEnabled] = useState(() => storedNotificationsEnabled());
+  const notifiedRef = useRef(createNotificationState());
+
+  useEffect(() => {
+    setSupport(getNotificationSupport(window));
+  }, []);
+
+  const toggle = useCallback(async () => {
+    if (!support.supported) return;
+    if (enabled) {
+      setEnabled(false);
+      setStoredNotificationsEnabled(false);
+      return;
+    }
+
+    let permission = support.permission;
+    if (permission === "default") {
+      permission = await Notification.requestPermission();
+    }
+    const nextSupport = getNotificationSupport(window);
+    setSupport(nextSupport);
+
+    const allowed = permission === "granted";
+    setEnabled(allowed);
+    setStoredNotificationsEnabled(allowed);
+  }, [enabled, support.permission, support.supported]);
+
+  useEffect(() => {
+    if (!enabled || support.permission !== "granted") return;
+    for (const match of liveMatches) {
+      if (!shouldNotifyLiveMatch(match, notifiedRef.current)) continue;
+      showPwaNotification(createLiveNotification(match, language)).catch(() => {});
+    }
+  }, [enabled, language, liveMatches, support.permission]);
+
+  const status =
+    !support.supported ? "unsupported" : support.permission === "denied" ? "blocked" : enabled ? "enabled" : "idle";
+
+  return { ...support, enabled, status, toggle };
+}
+
 function App() {
   const [language] = useState(detectUserLanguage);
   const i18n = languageConfig(language);
@@ -950,7 +1057,7 @@ function App() {
   const [group, setGroup] = useState("all");
   const [query, setQuery] = useState("");
   const [activeGroupId, setActiveGroupId] = useState("");
-  const [detailMatchId, setDetailMatchId] = useState(null);
+  const [detailMatchId, setDetailMatchId] = useState(initialDetailMatchId);
   const [installPrompt, setInstallPrompt] = useState(null);
 
   useEffect(() => {
@@ -1006,6 +1113,7 @@ function App() {
     () => matches.filter((match) => match.statusTone === "live").sort(compareMatchesByKickoff),
     [matches]
   );
+  const notifications = useLiveNotifications(liveMatches, language);
 
   const grouped = groupByDate(filteredMatches, language);
   const playedCount = matches.filter((match) => match.statusTone === "played").length;
@@ -1069,6 +1177,19 @@ function App() {
           <button className="icon-button" onClick={refresh} disabled={loading} title={i18n.refresh}>
             <RefreshCw size={18} className={loading ? "spin" : ""} />
             <span>{i18n.refresh}</span>
+          </button>
+          <button
+            className={`icon-button notification-button ${notifications.status === "enabled" ? "active" : ""}`}
+            onClick={notifications.toggle}
+            disabled={notifications.status === "unsupported" || notifications.status === "blocked"}
+            title={
+              notifications.status === "blocked"
+                ? i18n.notifications.permissionDenied
+                : i18n.notifications.title
+            }
+          >
+            {notifications.status === "enabled" ? <BellRing size={18} /> : <Bell size={18} />}
+            <span>{i18n.notifications[notifications.status] || i18n.notifications.enable}</span>
           </button>
           <button
             className="icon-button secondary"
