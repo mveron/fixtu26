@@ -1,0 +1,25 @@
+# Local agent/workspace state
+.agents/
+.codex/
+.codex_spreadsheet/
+
+# Dependencies and build output
+node_modules/
+dist/
+.netlify/
+
+# API exploration artifacts kept out of the public repo
+api_probe/
+api_probe_stats/
+outputs/
+/*.chunk.js
+/*.cjs
+/*.html
+/*.js
+/*.json
+/*.ps1
+/*.txt
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
