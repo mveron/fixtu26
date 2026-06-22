@@ -14,6 +14,7 @@ import {
   Download,
   ExternalLink,
   Filter,
+  GitBranch,
   Globe2,
   ListChecks,
   MapPin,
@@ -28,6 +29,7 @@ import {
   WifiOff
 } from "lucide-react";
 import "./styles.css";
+import { buildBracket } from "./bracket.js";
 import {
   NOTIFICATION_STORAGE_KEY,
   createLiveNotification,
@@ -73,6 +75,23 @@ const I18N = {
     },
     fixture: "Fixture",
     groups: "Groups",
+    bracket: {
+      title: "Bracket",
+      subtitle: "Knockout stage",
+      emptyTitle: "Knockout bracket not published yet",
+      emptyBody: "When FIFA publishes knockout matches, they will appear here.",
+      matches: "matches",
+      winner: "Winner",
+      penalties: "Penalties",
+      rounds: {
+        round32: "Round of 32",
+        round16: "Round of 16",
+        quarterfinals: "Quarter-finals",
+        semifinals: "Semi-finals",
+        thirdPlace: "Third place",
+        final: "Final"
+      }
+    },
     mainViews: "Main views",
     matches: "matches",
     played: "played",
@@ -224,6 +243,23 @@ const I18N = {
     },
     fixture: "Fixture",
     groups: "Grupos",
+    bracket: {
+      title: "Llaves",
+      subtitle: "Eliminación directa",
+      emptyTitle: "Las llaves todavía no fueron publicadas",
+      emptyBody: "Cuando FIFA publique los cruces eliminatorios, aparecerán acá.",
+      matches: "partidos",
+      winner: "Ganador",
+      penalties: "Penales",
+      rounds: {
+        round32: "Dieciseisavos",
+        round16: "Octavos",
+        quarterfinals: "Cuartos",
+        semifinals: "Semifinales",
+        thirdPlace: "Tercer puesto",
+        final: "Final"
+      }
+    },
     mainViews: "Vistas principales",
     matches: "partidos",
     played: "jugados",
@@ -956,7 +992,7 @@ function buildGroups(matches, language = "en") {
 
 function initialView() {
   const viewParam = new URLSearchParams(window.location.search).get("view");
-  return viewParam === "groups" ? "groups" : "fixture";
+  return ["fixture", "groups", "bracket"].includes(viewParam) ? viewParam : "fixture";
 }
 
 function initialStatus() {
@@ -1078,6 +1114,7 @@ function App() {
     [matches]
   );
   const groupData = useMemo(() => buildGroups(matches, language), [language, matches]);
+  const bracketData = useMemo(() => buildBracket(matches), [matches]);
 
   const filteredMatches = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -1287,11 +1324,17 @@ function App() {
             </div>
           </div>
         </section>
-      ) : (
+      ) : view === "groups" ? (
         <GroupsScreen
           groups={groupData}
           activeGroupId={activeGroupId}
           setActiveGroupId={setActiveGroupId}
+          loading={loading && !matches.length}
+          onOpenMatch={(match) => setDetailMatchId(match.id)}
+        />
+      ) : (
+        <BracketScreen
+          bracket={bracketData}
           loading={loading && !matches.length}
           onOpenMatch={(match) => setDetailMatchId(match.id)}
         />
@@ -1305,7 +1348,8 @@ function PrimaryNav({ activeView, setView }) {
   const { i18n } = useLanguage();
   const items = [
     ["fixture", i18n.fixture, CalendarDays],
-    ["groups", i18n.groups, Table2]
+    ["groups", i18n.groups, Table2],
+    ["bracket", i18n.bracket.title, GitBranch]
   ];
 
   return (
@@ -1321,6 +1365,125 @@ function PrimaryNav({ activeView, setView }) {
         </button>
       ))}
     </nav>
+  );
+}
+
+function BracketScreen({ bracket, loading, onOpenMatch }) {
+  const { i18n } = useLanguage();
+
+  if (loading) {
+    return (
+      <section className="bracket-screen">
+        <SkeletonList />
+      </section>
+    );
+  }
+
+  if (!bracket.totalMatches) {
+    return (
+      <section className="bracket-screen">
+        <div className="empty-state">
+          <GitBranch size={30} />
+          <strong>{i18n.bracket.emptyTitle}</strong>
+          <span>{i18n.bracket.emptyBody}</span>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="bracket-screen">
+      <div className="bracket-hero">
+        <div>
+          <span>{i18n.bracket.subtitle}</span>
+          <h2>{i18n.bracket.title}</h2>
+        </div>
+        <strong>{bracket.totalMatches} {i18n.bracket.matches}</strong>
+      </div>
+
+      <div className="bracket-scroll" aria-label={i18n.bracket.title}>
+        <div className="bracket-board">
+          {bracket.rounds.map((round) => (
+            <section className={`bracket-round ${round.key}`} key={round.key}>
+              <div className="bracket-round-head">
+                <h3>{i18n.bracket.rounds[round.key] || round.key}</h3>
+                <span>{round.matches.length}</span>
+              </div>
+              <div className="bracket-match-stack">
+                {round.matches.map((match) => (
+                  <BracketMatchCard key={match.id} match={match} onOpen={() => onOpenMatch(match)} />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BracketMatchCard({ match, onOpen }) {
+  const { language, i18n } = useLanguage();
+  const goalSide = useScorePulse(match.id, match.homeScore, match.awayScore);
+  const isLive = match.statusTone === "live";
+  const hasPenalties =
+    match.homePenaltyScore !== null &&
+    match.homePenaltyScore !== undefined &&
+    match.awayPenaltyScore !== null &&
+    match.awayPenaltyScore !== undefined &&
+    Number.isFinite(Number(match.homePenaltyScore)) &&
+    Number.isFinite(Number(match.awayPenaltyScore));
+  return (
+    <button
+      className={`bracket-match ${isLive ? "live" : ""} ${goalSide ? `goal-${goalSide}` : ""}`}
+      onClick={onOpen}
+    >
+      <div className="bracket-match-meta">
+        <span>{i18n.matchNumber} {match.matchNumber}</span>
+        <strong>{timeLabel(match, language)}</strong>
+      </div>
+
+      <BracketTeamRow
+        code={match.homeCode}
+        name={match.homeName}
+        flag={match.homeFlag}
+        score={match.homeScore}
+        penaltyScore={match.homePenaltyScore}
+        winner={match.winner?.side === "home"}
+        highlight={goalSide === "home"}
+        hasPenalties={hasPenalties}
+      />
+      <BracketTeamRow
+        code={match.awayCode}
+        name={match.awayName}
+        flag={match.awayFlag}
+        score={match.awayScore}
+        penaltyScore={match.awayPenaltyScore}
+        winner={match.winner?.side === "away"}
+        highlight={goalSide === "away"}
+        hasPenalties={hasPenalties}
+      />
+
+      <div className="bracket-match-footer">
+        <span className={`status-pill ${match.statusTone}`}>{match.statusLabel}</span>
+        {hasPenalties && <small>{i18n.bracket.penalties}</small>}
+        {match.winner && <small>{i18n.bracket.winner}: {match.winner.code}</small>}
+      </div>
+    </button>
+  );
+}
+
+function BracketTeamRow({ code, name, flag, score, penaltyScore, winner, highlight, hasPenalties }) {
+  return (
+    <div className={`bracket-team ${winner ? "winner" : ""} ${highlight ? "goal-side" : ""}`}>
+      {flag ? <img src={flagUrl(flag)} alt="" /> : <span className="flag-placeholder">{code?.[0] || "?"}</span>}
+      <div>
+        <strong>{code}</strong>
+        <small>{name}</small>
+      </div>
+      <span className="bracket-score">{score ?? "-"}</span>
+      {hasPenalties && <span className="bracket-penalty">{penaltyScore ?? "-"}</span>}
+    </div>
   );
 }
 

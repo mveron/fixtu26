@@ -125,7 +125,7 @@ p {
 
 .primary-nav {
   display: inline-grid;
-  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
   gap: 6px;
   padding: 5px;
   margin: 0 0 16px;
@@ -357,6 +357,7 @@ p {
 .match-spotlight.live,
 .match-row.live,
 .group-match-item.live,
+.bracket-match.live,
 .match-hero.live {
   position: relative;
   isolation: isolate;
@@ -366,6 +367,7 @@ p {
 .match-spotlight.live::before,
 .match-row.live::before,
 .group-match-item.live::before,
+.bracket-match.live::before,
 .match-hero.live::before {
   content: "";
   position: absolute;
@@ -396,6 +398,7 @@ p {
 .match-spotlight.live::after,
 .match-row.live::after,
 .group-match-item.live::after,
+.bracket-match.live::after,
 .match-hero.live::after {
   content: "";
   position: absolute;
@@ -419,6 +422,7 @@ p {
 .match-spotlight.live > *,
 .match-row.live > *,
 .group-match-item.live > *,
+.bracket-match.live > *,
 .match-hero.live > * {
   position: relative;
   z-index: 1;
@@ -433,6 +437,7 @@ p {
 
 .match-row.live,
 .group-match-item.live,
+.bracket-match.live,
 .match-hero.live {
   box-shadow:
     0 12px 30px rgba(7, 24, 47, 0.08),
@@ -780,6 +785,244 @@ p {
 .groups-screen {
   display: grid;
   gap: 14px;
+}
+
+.bracket-screen {
+  display: grid;
+  gap: 14px;
+}
+
+.bracket-hero {
+  min-height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid rgba(19, 189, 212, 0.22);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(135deg, rgba(19, 189, 212, 0.18), rgba(22, 163, 111, 0.1)),
+    rgba(255, 255, 255, 0.86);
+  box-shadow: var(--shadow);
+}
+
+.bracket-hero span,
+.bracket-hero strong,
+.bracket-round-head span,
+.bracket-match-meta span,
+.bracket-match-footer small {
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.bracket-hero h2 {
+  margin-top: 4px;
+  font-size: clamp(1.45rem, 2.6vw, 2.35rem);
+  line-height: 1;
+}
+
+.bracket-scroll {
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.bracket-board {
+  min-width: 1120px;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(172px, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.bracket-round {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.bracket-round:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 54px;
+  right: -10px;
+  bottom: 18px;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, transparent, rgba(19, 189, 212, 0.42), transparent);
+}
+
+.bracket-round-head {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.bracket-round-head h3 {
+  font-size: 0.92rem;
+  line-height: 1.1;
+}
+
+.bracket-round-head span {
+  min-width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+.bracket-match-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.bracket-round.round16 .bracket-match-stack {
+  padding-top: 26px;
+}
+
+.bracket-round.quarterfinals .bracket-match-stack {
+  padding-top: 62px;
+}
+
+.bracket-round.semifinals .bracket-match-stack {
+  padding-top: 116px;
+}
+
+.bracket-round.thirdPlace .bracket-match-stack,
+.bracket-round.final .bracket-match-stack {
+  padding-top: 176px;
+}
+
+.bracket-match {
+  width: 100%;
+  position: relative;
+  min-height: 154px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--ink);
+  text-align: left;
+  box-shadow: 0 12px 32px rgba(7, 24, 47, 0.07);
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.bracket-match:hover {
+  transform: translateY(-2px);
+  border-color: rgba(19, 189, 212, 0.55);
+  box-shadow: 0 16px 36px rgba(7, 24, 47, 0.1);
+}
+
+.bracket-match::before {
+  border-radius: var(--radius);
+}
+
+.bracket-match-meta,
+.bracket-match-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bracket-match-meta strong {
+  font-size: 0.84rem;
+}
+
+.bracket-team {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 6px;
+  border-radius: 7px;
+  background: rgba(237, 243, 248, 0.7);
+}
+
+.bracket-team.winner {
+  background: linear-gradient(90deg, rgba(22, 163, 111, 0.18), rgba(19, 189, 212, 0.08));
+  box-shadow: inset 3px 0 0 var(--green);
+}
+
+.bracket-team img,
+.bracket-team .flag-placeholder {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.bracket-team .flag-placeholder {
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.bracket-team div {
+  min-width: 0;
+}
+
+.bracket-team strong,
+.bracket-team small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bracket-team strong {
+  line-height: 1.1;
+}
+
+.bracket-team small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.bracket-score {
+  min-width: 22px;
+  font-size: 1.1rem;
+  font-weight: 920;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.bracket-penalty {
+  min-width: 22px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-align: center;
+}
+
+.bracket-match-footer {
+  min-height: 25px;
 }
 
 .group-picker {
@@ -2514,11 +2757,14 @@ p {
   .match-row.live::after,
   .group-match-item.live::before,
   .group-match-item.live::after,
+  .bracket-match.live::before,
+  .bracket-match.live::after,
   .match-hero.live::before,
   .match-hero.live::after,
   .match-spotlight.live,
   .match-row.live,
   .group-match-item.live,
+  .bracket-match.live,
   .match-hero.live,
   .status-pill.live::before,
   .score-number.score-goal,
