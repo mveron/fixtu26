@@ -1206,7 +1206,6 @@ function App() {
             <h1>{i18n.title}</h1>
             <p>{i18n.tagline}</p>
           </div>
-          <img className="worldcup-wordmark" src="/brand/worldcup26-wordmark.svg" alt="FIFA World Cup 26" />
         </div>
         <div className="topbar-actions">
           <span className={`connection ${navigator.onLine ? "online" : "offline"}`}>
@@ -1652,43 +1651,16 @@ function GroupMatchItem({ match, onOpen }) {
   );
 }
 
-function MatchSpotlight({ liveMatches, nextMatch, onOpen }) {
+function SpotlightCard({ match, hasLive, title, onOpen }) {
   const { language, i18n } = useLanguage();
-  const [activeIndex, setActiveIndex] = useState(0);
-  const hasLive = liveMatches.length > 0;
-  const spotlightMatches = hasLive ? liveMatches : nextMatch ? [nextMatch] : [];
-  const activeMatch = spotlightMatches[activeIndex] || spotlightMatches[0];
-
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [hasLive, spotlightMatches.length]);
-
-  const multipleLive = hasLive && spotlightMatches.length > 1;
-  const title = hasLive ? i18n.spotlightLive : i18n.spotlightNext;
-  const goalSide = useScorePulse(activeMatch?.id, activeMatch?.homeScore, activeMatch?.awayScore);
-
-  if (!activeMatch) return null;
+  const goalSide = useScorePulse(match?.id, match?.homeScore, match?.awayScore);
 
   const meta = hasLive
-    ? [liveClockLabel(activeMatch, language), activeMatch.stage, activeMatch.group].filter(Boolean).join(" · ")
-    : `${formatDate(activeMatch.date, { weekday: "short", day: "2-digit", month: "short" }, language)} · ${timeLabel(activeMatch, language)}`;
-
-  function previous(event) {
-    event.stopPropagation();
-    setActiveIndex((current) => (current - 1 + spotlightMatches.length) % spotlightMatches.length);
-  }
-
-  function next(event) {
-    event.stopPropagation();
-    setActiveIndex((current) => (current + 1) % spotlightMatches.length);
-  }
-
-  function stopCarouselKeyDown(event) {
-    event.stopPropagation();
-  }
+    ? [liveClockLabel(match, language), match.stage, match.group].filter(Boolean).join(" · ")
+    : `${formatDate(match.date, { weekday: "short", day: "2-digit", month: "short" }, language)} · ${timeLabel(match, language)}`;
 
   function openActiveMatch() {
-    onOpen(activeMatch);
+    onOpen(match);
   }
 
   function handleKeyDown(event) {
@@ -1705,62 +1677,136 @@ function MatchSpotlight({ liveMatches, nextMatch, onOpen }) {
       tabIndex={0}
       onClick={openActiveMatch}
       onKeyDown={handleKeyDown}
-      aria-label={`${title}: ${activeMatch.homeCode} vs ${activeMatch.awayCode}`}
+      aria-label={`${title}: ${match.homeCode} vs ${match.awayCode}`}
     >
       <div className="spotlight-topline">
         <span>{title}</span>
-        {multipleLive && <small>{activeIndex + 1} / {spotlightMatches.length}</small>}
       </div>
 
       <div className="spotlight-scoreboard">
         <div className={`spotlight-team ${goalSide === "home" ? "goal-side" : ""}`}>
-          {activeMatch.homeFlag && <img src={flagUrl(activeMatch.homeFlag)} alt="" />}
-          <strong>{activeMatch.homeCode}</strong>
+          {match.homeFlag && <img src={flagUrl(match.homeFlag)} alt="" />}
+          <strong>{match.homeCode}</strong>
         </div>
         <div className="spotlight-score">
           <AnimatedScore
-            homeScore={activeMatch.homeScore}
-            awayScore={activeMatch.awayScore}
+            homeScore={match.homeScore}
+            awayScore={match.awayScore}
             goalSide={goalSide}
           />
           <span>{meta}</span>
         </div>
         <div className={`spotlight-team away ${goalSide === "away" ? "goal-side" : ""}`}>
-          {activeMatch.awayFlag && <img src={flagUrl(activeMatch.awayFlag)} alt="" />}
-          <strong>{activeMatch.awayCode}</strong>
+          {match.awayFlag && <img src={flagUrl(match.awayFlag)} alt="" />}
+          <strong>{match.awayCode}</strong>
         </div>
       </div>
 
       <div className="spotlight-footer">
         <span>
           <MapPin size={14} />
-          {activeMatch.city || activeMatch.stadium || i18n.venueTbd}
+          {match.city || match.stadium || i18n.venueTbd}
         </span>
-        {multipleLive && (
-          <div className="spotlight-controls" aria-label={i18n.liveMatches}>
-            <button
-              type="button"
-              onClick={previous}
-              onKeyDown={stopCarouselKeyDown}
-              aria-label={i18n.previousLive}
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <div>
-              {spotlightMatches.map((match, index) => (
-                <span key={match.id} className={index === activeIndex ? "active" : ""} />
-              ))}
+      </div>
+    </section>
+  );
+}
+
+function MatchSpotlight({ liveMatches, nextMatch, onOpen }) {
+  const { i18n } = useLanguage();
+  const [activeIndex, setActiveIndex] = useState(0);
+  const swipeStartRef = useRef(null);
+  const hasLive = liveMatches.length > 0;
+  const spotlightMatches = hasLive ? liveMatches : nextMatch ? [nextMatch] : [];
+  const multipleLive = hasLive && spotlightMatches.length > 1;
+  const title = hasLive ? i18n.spotlightLive : i18n.spotlightNext;
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [hasLive, spotlightMatches.length]);
+
+  if (!spotlightMatches.length) return null;
+
+  function showPrevious() {
+    setActiveIndex((current) => (current - 1 + spotlightMatches.length) % spotlightMatches.length);
+  }
+
+  function showNext() {
+    setActiveIndex((current) => (current + 1) % spotlightMatches.length);
+  }
+
+  function previous(event) {
+    event.stopPropagation();
+    showPrevious();
+  }
+
+  function next(event) {
+    event.stopPropagation();
+    showNext();
+  }
+
+  function stopCarouselKeyDown(event) {
+    event.stopPropagation();
+  }
+
+  function handlePointerDown(event) {
+    if (!multipleLive) return;
+    swipeStartRef.current = { x: event.clientX, y: event.clientY };
+  }
+
+  function handlePointerUp(event) {
+    if (!multipleLive || !swipeStartRef.current) return;
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    const deltaX = event.clientX - start.x;
+    const deltaY = event.clientY - start.y;
+    if (Math.abs(deltaX) < 42 || Math.abs(deltaX) < Math.abs(deltaY)) return;
+    if (deltaX < 0) showNext();
+    else showPrevious();
+  }
+
+  if (!multipleLive) {
+    return (
+      <SpotlightCard
+        match={spotlightMatches[0]}
+        hasLive={hasLive}
+        title={title}
+        onOpen={onOpen}
+      />
+    );
+  }
+
+  return (
+    <section className="spotlight-carousel-shell live" aria-label={i18n.liveMatches}>
+      <div
+        className="spotlight-carousel-viewport"
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={() => {
+          swipeStartRef.current = null;
+        }}
+      >
+        <div className="spotlight-track" style={{ transform: `translateX(-${activeIndex * 100}%)` }}>
+          {spotlightMatches.map((match, index) => (
+            <div className="spotlight-slide" key={match.id} aria-hidden={index !== activeIndex}>
+              <SpotlightCard match={match} hasLive={hasLive} title={title} onOpen={onOpen} />
             </div>
-            <button
-              type="button"
-              onClick={next}
-              onKeyDown={stopCarouselKeyDown}
-              aria-label={i18n.nextLive}
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        )}
+          ))}
+        </div>
+      </div>
+      <div className="spotlight-controls" aria-label={i18n.liveMatches}>
+        <button type="button" onClick={previous} onKeyDown={stopCarouselKeyDown} aria-label={i18n.previousLive}>
+          <ChevronLeft size={16} />
+        </button>
+        <div>
+          {spotlightMatches.map((match, index) => (
+            <span key={match.id} className={index === activeIndex ? "active" : ""} />
+          ))}
+        </div>
+        <small>{activeIndex + 1} / {spotlightMatches.length}</small>
+        <button type="button" onClick={next} onKeyDown={stopCarouselKeyDown} aria-label={i18n.nextLive}>
+          <ChevronRight size={16} />
+        </button>
       </div>
     </section>
   );
