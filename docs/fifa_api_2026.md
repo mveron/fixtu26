@@ -155,6 +155,36 @@ Campos adicionales observados:
 
 Para partidos futuros este endpoint puede devolver una respuesta vacia o minima. Para esos casos, usar `calendar/matches` como fuente base.
 
+### Campos utiles para visuales de jugadores
+
+El endpoint `live/football/{matchId}` tambien entrega informacion util para mejorar la UI del detalle de partido:
+
+| Campo | Descripcion |
+|---|---|
+| `HomeTeam.Tactics` / `AwayTeam.Tactics` | Formacion textual, por ejemplo `4-1-3-2`. |
+| `HomeTeam.Players[]` / `AwayTeam.Players[]` | Lista de jugadores, titulares y suplentes. |
+| `Players[].IdPlayer` | ID FIFA del jugador. Sirve para cruzar con timeline o stats. |
+| `Players[].ShirtNumber` | Numero de camiseta. |
+| `Players[].Position` | Codigo de posicion. `0` arquero, `1` defensa, `2` mediocampo, `3` delantero. |
+| `Players[].Status` | Estado del jugador en la planilla. |
+| `Players[].Captain` | Booleano para capitan. |
+| `Players[].FieldStatus` | Estado de campo si esta disponible. |
+| `Players[].PlayerPicture.PictureUrl` | URL de imagen del jugador en `digitalhub.fifa.com`. |
+| `Players[].LineupX` / `Players[].LineupY` | Coordenadas de alineacion cuando FIFA las publica. En ARG vs AUT estaban vacias. |
+
+Ejemplo real observado para ARG vs AUT (`IdMatch=400021494`):
+
+```json
+{
+  "IdPlayer": "229397",
+  "ShirtNumber": 10,
+  "Captain": true,
+  "PlayerPicture": {
+    "PictureUrl": "https://digitalhub.fifa.com/transform/19823774-fac0-485a-8a8f-572e7324c6c2/MESSI-Lionel_229397"
+  }
+}
+```
+
 ## Timeline de eventos
 
 Endpoint:
@@ -214,6 +244,31 @@ Campos importantes dentro de `Event`:
 | `Qualifiers` | Metadatos del evento. |
 
 Para partidos futuros, `Event` puede venir vacio.
+
+### Estadisticas basicas derivables desde timeline
+
+La pagina de FIFA del partido Argentina vs Austria muestra una pestana de estadisticas con bloques como ataque, posesion, disciplina, remates, pases y rupturas de linea. Esas estadisticas completas no aparecieron como objeto estructurado en `live/football/{matchId}` ni en `timelines/{matchId}`.
+
+Sin embargo, `timelines/{matchId}` si permite derivar metricas basicas a partir de `Event[]`, agrupando por `Type` o `TypeLocalized` y por `IdTeam`.
+
+Para ARG vs AUT (`IdMatch=400021494`) se observaron 81 eventos y se pudieron derivar:
+
+| Metrica derivada | Argentina | Austria | Fuente |
+|---|---:|---:|---|
+| Goles | 2 | 0 | Timeline `TypeLocalized = ¡Gol!` |
+| Remates registrados | 12 | 6 | Timeline `Type = 12` / `Remate a puerta` |
+| Faltas | 12 | 12 | Timeline `Falta` |
+| Corners | 1 | 3 | Timeline `Saque de esquina` |
+| Amarillas | 2 | 2 | Timeline `Tarjeta amarilla` |
+| Sustituciones | 5 | 5 | Timeline `Sustitución` |
+| Fuera de juego | 2 | 0 | Timeline `Fuera de juego` |
+
+Recomendacion para la app:
+
+1. Mostrar primero estas estadisticas derivadas porque salen de endpoints accesibles.
+2. Etiquetarlas internamente como "event stats" para no confundirlas con las estadisticas oficiales avanzadas de FIFA.
+3. Mantener el tab preparado para incorporar estadisticas avanzadas si aparece un endpoint accesible y estable.
+4. Usar `IdPlayer` del timeline para resaltar jugador, foto y nombre cuando coincida con `HomeTeam.Players[]` o `AwayTeam.Players[]`.
 
 ## Estadisticas de temporada
 
@@ -295,6 +350,50 @@ GET https://fdh-api.fifa.com/v1/powerranking/match/400021443.json
 ```
 
 En la prueba devolvieron `404`.
+
+Para el partido Argentina vs Austria tambien se probaron:
+
+```http
+GET https://fdh-api.fifa.com/v1/stats/match/400021494/teams.json
+GET https://fdh-api.fifa.com/v1/stats/match/400021494/players.json
+GET https://fdh-api.fifa.com/v1/powerranking/match/400021494.json
+```
+
+Resultado observado: `404` en los tres endpoints.
+
+## Gameday API observada en el frontend de FIFA
+
+El bundle publico de `www.fifa.com` contiene referencias a una API Gameday:
+
+```text
+https://gameday-prod.fifa.mangodev.co.uk/1-0
+```
+
+El frontend incluye funciones internas equivalentes a:
+
+```http
+GET /events?query=_externalId==`{matchId}`
+GET /events?query=(tag name==`urn:gd:tag:event:fdcp:match_id` value==`{matchId}`)
+GET /keyMoments?query=(tag name==`urn:gd:tag:km:fifa:fdcp:match_id` value==`{matchId}`)
+```
+
+Tambien se observo que Gameday puede mapear estadisticas desde tags de participantes:
+
+```text
+participants.team.tags
+urn:gd:tag:football:stats:...
+urn:gd:tag:football:stats:unofficial
+```
+
+Pero al probarlo directamente desde este workspace:
+
+```http
+GET https://gameday-prod.fifa.mangodev.co.uk/1-0/events?query=_externalId%3D%3D%60400021494%60&limit=1
+```
+
+Resultado observado: `403 Forbidden`.
+
+Conclusion: no conviene integrar Gameday directamente en la PWA hasta encontrar un acceso permitido y estable. Para produccion, usar `api.fifa.com/api/v3` y derivar estadisticas basicas desde timeline.
 
 ## Normalizacion recomendada
 

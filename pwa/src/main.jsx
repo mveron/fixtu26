@@ -34,8 +34,8 @@ import {
   NOTIFICATION_STORAGE_KEY,
   createLiveNotification,
   createNotificationState,
+  getLiveNotificationEvents,
   getNotificationSupport,
-  shouldNotifyLiveMatch
 } from "./notifications.js";
 
 const FIFA_API_BASE = "https://api.fifa.com/api/v3";
@@ -1071,8 +1071,9 @@ function useLiveNotifications(liveMatches, language) {
   useEffect(() => {
     if (!enabled || support.permission !== "granted") return;
     for (const match of liveMatches) {
-      if (!shouldNotifyLiveMatch(match, notifiedRef.current)) continue;
-      showPwaNotification(createLiveNotification(match, language)).catch(() => {});
+      for (const event of getLiveNotificationEvents(match, notifiedRef.current)) {
+        showPwaNotification(createLiveNotification(match, event, language)).catch(() => {});
+      }
     }
   }, [enabled, language, liveMatches, support.permission]);
 
