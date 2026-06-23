@@ -23,7 +23,6 @@ import {
   Shirt,
   ShieldCheck,
   Table2,
-  Trophy,
   UsersRound,
   Wifi,
   WifiOff
@@ -60,8 +59,9 @@ const I18N = {
     sourceFifa: "FIFA API",
     sourceCache: "Local cache",
     sourceSnapshot: "Offline snapshot",
-    title: "World Cup 2026 Fixture",
-    tagline: "Matches, groups, status and real-time detail",
+    title: "Fixtu26",
+    tagline: "World Cup 26 fixture, groups and live match detail",
+    brandKicker: "Unofficial match companion",
     refresh: "Refresh",
     install: "Install",
     installPwa: "Install PWA",
@@ -228,8 +228,9 @@ const I18N = {
     sourceFifa: "FIFA API",
     sourceCache: "Cache local",
     sourceSnapshot: "Snapshot offline",
-    title: "Fixture Mundial 2026",
-    tagline: "Partidos, grupos, estados y detalle en tiempo real",
+    title: "Fixtu26",
+    tagline: "Fixture, grupos y detalle en vivo del Mundial 26",
+    brandKicker: "Companion no oficial",
     refresh: "Actualizar",
     install: "Instalar",
     installPwa: "Instalar PWA",
@@ -1199,13 +1200,13 @@ function App() {
     <main className="app-shell">
       <header className="topbar">
         <div className="brand">
-          <div className="brand-mark" aria-hidden="true">
-            <Trophy size={22} />
-          </div>
-          <div>
+          <img className="brand-mark" src="/icons/icon-96.png" alt="" aria-hidden="true" />
+          <div className="brand-copy">
+            <span className="brand-kicker">{i18n.brandKicker}</span>
             <h1>{i18n.title}</h1>
             <p>{i18n.tagline}</p>
           </div>
+          <img className="worldcup-wordmark" src="/brand/worldcup26-wordmark.svg" alt="FIFA World Cup 26" />
         </div>
         <div className="topbar-actions">
           <span className={`connection ${navigator.onLine ? "online" : "offline"}`}>
