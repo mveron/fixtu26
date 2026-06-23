@@ -1362,7 +1362,7 @@ function PrimaryNav({ activeView, setView }) {
           onClick={() => setView(value)}
         >
           <Icon size={17} />
-          {label}
+          <span>{label}</span>
         </button>
       ))}
     </nav>
