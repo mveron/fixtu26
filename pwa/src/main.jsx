@@ -678,7 +678,11 @@ function AnimatedScore({ homeScore, awayScore, goalSide, separator = ":", compac
   const hasScore = homeScore !== null || awayScore !== null;
 
   if (!hasScore) {
-    return <strong className="animated-score score-vs">vs</strong>;
+    return (
+      <strong className="animated-score score-vs">
+        <span className="score-vs-text">vs</span>
+      </strong>
+    );
   }
 
   return (
